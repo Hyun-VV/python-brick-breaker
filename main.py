@@ -3,7 +3,7 @@ import sys
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '0.2.1' # 버그 수정 버전
+__version__ = '0.2.2' # 인덱스 버그 수정
 __author__ = 'Python Developer'
 
 # --- 설정 상수 ---
@@ -59,14 +59,13 @@ class Ball:
             BALL_RADIUS * 2,
             BALL_RADIUS * 2
         )
-        self.dx = 5  # 속도 약간 증가
+        self.dx = 5 
         self.dy = -5
 
     def move(self):
         self.rect.x += self.dx
         self.rect.y += self.dy
         
-        # 벽 충돌
         if self.rect.left <= 0 or self.rect.right >= SCREEN_WIDTH:
             self.dx *= -1
         if self.rect.top <= 0:
@@ -125,40 +124,34 @@ def main():
             score = 0 
             for brick in bricks: brick.active = True
         
-        # --- [수정된 부분 1: 패들 충돌 로직] ---
+        # [패들 충돌 로직]
         if ball.rect.colliderect(paddle.rect):
-            # 겹친 영역(intersection)을 계산
             collision_rect = ball.rect.clip(paddle.rect)
             
-            # 가로로 겹친 게 세로로 겹친 것보다 작으면 -> 옆면 충돌
             if collision_rect.width < collision_rect.height:
-                ball.dx *= -1 # 옆으로 튕겨라
+                ball.dx *= -1 # 옆면
             else:
-                # 위아래 충돌 (대부분 이 경우)
-                ball.dy *= -1
-                # 공이 패들 안으로 파고들었으면, 강제로 패들 위로 끄집어냄 (위치 보정)
+                ball.dy *= -1 # 윗면
                 ball.rect.bottom = paddle.rect.top 
 
-        # --- [수정된 부분 2: 벽돌 충돌 로직] ---
-        # hit_index: 충돌한 벽돌이 리스트의 몇 번째인지 알려줌
-        # active 상태인 벽돌들만 검사
-        hit_index = ball.rect.collidelist([b.rect for b in bricks if b.active])
-        
-        if hit_index != -1: # 충돌한 벽돌이 있다면
-            brick = bricks[hit_index]
-            brick.active = False
-            score += 10
-            
-            # 겹친 영역 계산 (패들과 동일한 원리)
-            collision_rect = ball.rect.clip(brick.rect)
-            
-            # 가로 겹침 vs 세로 겹침 비교
-            if collision_rect.width >= collision_rect.height:
-                ball.dy *= -1 # 위/아래를 맞았으니 위아래 방향 반전
-            else:
-                ball.dx *= -1 # 옆면을 맞았으니 좌우 방향 반전
-        
-        # 승리 조건
+        # [수정된 벽돌 충돌 로직]
+        # 반복문을 직접 돌면서 정확한 벽돌 객체를 찾습니다.
+        for brick in bricks:
+            if brick.active and ball.rect.colliderect(brick.rect):
+                # 충돌 발생!
+                brick.active = False
+                score += 10
+                
+                # 물리 반사 계산 (v0.2.1의 로직을 여기로 가져옴)
+                collision_rect = ball.rect.clip(brick.rect)
+                
+                if collision_rect.width >= collision_rect.height:
+                    ball.dy *= -1 # 위아래 충돌
+                else:
+                    ball.dx *= -1 # 옆면 충돌
+                
+                break # 한 프레임에 벽돌 하나만 깨지도록 루프 종료
+
         if all(not brick.active for brick in bricks):
             print("You Win!")
             ball.reset()
