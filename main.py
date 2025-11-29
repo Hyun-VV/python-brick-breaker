@@ -4,7 +4,7 @@ import random
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '0.3.1' # 개발자 치트키(C) 추가
+__version__ = '0.4.0' # 시작 화면 및 상태 관리 추가
 __author__ = 'Python Developer'
 
 # --- 설정 상수 ---
@@ -26,7 +26,7 @@ RED = (255, 0, 0)
 BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
 DARK_GRAY = (50, 50, 50)
-YELLOW = (255, 255, 0)
+YELLOW = (255, 215, 0)
 
 # --- 클래스 정의 ---
 
@@ -61,7 +61,6 @@ class Ball:
             BALL_RADIUS * 2,
             BALL_RADIUS * 2
         )
-        # 레벨이 오를수록 공 속도 증가
         base_speed = 4 + level 
         self.dx = random.choice([-base_speed, base_speed]) 
         self.dy = -base_speed 
@@ -100,95 +99,140 @@ def main():
     pygame.display.set_caption(f"{__title__} v{__version__}")
     clock = pygame.time.Clock()
 
+    # 폰트 설정
     score_font = pygame.font.SysFont(None, 36)
-    large_font = pygame.font.SysFont(None, 72)
+    title_font = pygame.font.SysFont(None, 80) # 제목용 큰 폰트
+    sub_font = pygame.font.SysFont(None, 40)   # 안내 문구용 중간 폰트
 
     paddle = Paddle()
     ball = Ball()
     
     bricks = []
-    for row in range(BRICK_ROWS):
-        for col in range(BRICK_COLS):
-            brick_x = 15 + col * (BRICK_WIDTH + 5)
-            brick_y = 15 + row * (BRICK_HEIGHT + 5)
-            bricks.append(Brick(brick_x, brick_y))
+    def create_bricks():
+        new_bricks = []
+        for row in range(BRICK_ROWS):
+            for col in range(BRICK_COLS):
+                brick_x = 15 + col * (BRICK_WIDTH + 5)
+                brick_y = 15 + row * (BRICK_HEIGHT + 5)
+                new_bricks.append(Brick(brick_x, brick_y))
+        return new_bricks
+
+    bricks = create_bricks()
     
     score = 0
     level = 1
+    
+    # [1] 게임 상태 변수: 'START', 'PLAYING', 'GAME_OVER'
+    game_state = 'START'
 
     running = True
     while running:
-        # [1] 이벤트 처리
+        # 이벤트 처리
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             
-            # --- [개발자용 치트키 추가됨] ---
+            # 키 입력 처리 (상태에 따라 다르게 동작)
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_c: # 'C' 키를 누르면
-                    # 모든 벽돌을 비활성화(깨짐) 상태로 변경
-                    for brick in bricks:
-                        brick.active = False
-            # -----------------------------
-
-        paddle.move()
-        
-        if not ball.move():
-            screen.fill(WHITE)
-            text = large_font.render("GAME OVER", True, RED)
-            text_rect = text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2))
-            screen.blit(text, text_rect)
-            pygame.display.flip()
-            
-            pygame.time.delay(2000)
-            
-            score = 0
-            level = 1
-            ball.reset(level)
-            for brick in bricks: brick.active = True
-        
-        if ball.rect.colliderect(paddle.rect):
-            collision_rect = ball.rect.clip(paddle.rect)
-            if collision_rect.width < collision_rect.height:
-                ball.dx *= -1 
-            else:
-                ball.dy *= -1 
-                ball.rect.bottom = paddle.rect.top 
-
-        for brick in bricks:
-            if brick.active and ball.rect.colliderect(brick.rect):
-                brick.active = False
-                score += 10 + (level * 2)
+                # [대기 상태일 때] 스페이스바 누르면 게임 시작
+                if game_state == 'START':
+                    if event.key == pygame.K_SPACE:
+                        game_state = 'PLAYING'
                 
-                collision_rect = ball.rect.clip(brick.rect)
-                if collision_rect.width >= collision_rect.height:
-                    ball.dy *= -1 
-                else:
+                # [게임 중일 때] 치트키 사용 가능
+                elif game_state == 'PLAYING':
+                    if event.key == pygame.K_c: # 치트키
+                         for brick in bricks: brick.active = False
+                
+                # [게임 오버 상태일 때] 스페이스바 누르면 재시작 (1레벨부터)
+                elif game_state == 'GAME_OVER':
+                    if event.key == pygame.K_SPACE:
+                        score = 0
+                        level = 1
+                        ball.reset(level)
+                        bricks = create_bricks()
+                        game_state = 'PLAYING'
+
+        screen.fill(WHITE) # 배경 지우기
+
+        # --- 상태별 화면 그리기 및 로직 ---
+
+        if game_state == 'START':
+            # [시작 화면]
+            title_text = title_font.render("BRICK BREAKER", True, BLUE)
+            start_text = sub_font.render("Press SPACE to Start", True, BLACK)
+            
+            # 중앙 정렬
+            screen.blit(title_text, title_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 50)))
+            screen.blit(start_text, start_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 20)))
+
+        elif game_state == 'PLAYING':
+            # [게임 플레이 화면]
+            paddle.move()
+            
+            # 공 움직임 체크
+            if not ball.move():
+                game_state = 'GAME_OVER' # 공 떨어지면 상태 변경
+            
+            # 충돌 로직
+            if ball.rect.colliderect(paddle.rect):
+                collision_rect = ball.rect.clip(paddle.rect)
+                if collision_rect.width < collision_rect.height:
                     ball.dx *= -1 
-                break 
+                else:
+                    ball.dy *= -1 
+                    ball.rect.bottom = paddle.rect.top 
 
-        # [승리 조건 체크]
-        if all(not brick.active for brick in bricks):
-            screen.fill(WHITE)
-            clear_text = large_font.render(f"STAGE {level} CLEAR!", True, BLUE)
-            text_rect = clear_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2))
-            screen.blit(clear_text, text_rect)
-            pygame.display.flip()
+            for brick in bricks:
+                if brick.active and ball.rect.colliderect(brick.rect):
+                    brick.active = False
+                    score += 10 + (level * 2)
+                    
+                    collision_rect = ball.rect.clip(brick.rect)
+                    if collision_rect.width >= collision_rect.height:
+                        ball.dy *= -1 
+                    else:
+                        ball.dx *= -1 
+                    break 
+
+            # 클리어 체크
+            if all(not brick.active for brick in bricks):
+                # 잠시 멈춤 효과 없이 바로 메시지 띄우고 싶다면 여기 로직 수정 가능
+                # 현재는 화면 멈춤(delay) 사용
+                screen.fill(WHITE)
+                # 객체들 마지막 모습 그리기
+                paddle.draw(screen)
+                ball.draw(screen)
+                for brick in bricks: brick.draw(screen)
+                
+                clear_text = title_font.render(f"STAGE {level} CLEAR!", True, BLUE)
+                screen.blit(clear_text, clear_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2)))
+                pygame.display.flip()
+                
+                pygame.time.delay(2000) # 2초 대기
+                
+                level += 1
+                ball.reset(level)
+                for brick in bricks: brick.active = True
+
+            # 그리기
+            paddle.draw(screen)
+            ball.draw(screen)
+            for brick in bricks: brick.draw(screen)
             
-            pygame.time.delay(2000)
+            # 점수판
+            score_text = score_font.render(f"Score: {score}  Level: {level}", True, DARK_GRAY)
+            screen.blit(score_text, (10, 10))
+
+        elif game_state == 'GAME_OVER':
+            # [게임 오버 화면]
+            over_text = title_font.render("GAME OVER", True, RED)
+            score_msg = sub_font.render(f"Final Score: {score}", True, BLACK)
+            retry_text = sub_font.render("Press SPACE to Retry", True, DARK_GRAY)
             
-            level += 1
-            ball.reset(level)
-            for brick in bricks: brick.active = True
-
-        screen.fill(WHITE)
-        paddle.draw(screen)
-        ball.draw(screen)
-        for brick in bricks:
-            brick.draw(screen)
-
-        score_text = score_font.render(f"Score: {score}  Level: {level}", True, DARK_GRAY)
-        screen.blit(score_text, (10, 10))
+            screen.blit(over_text, over_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 60)))
+            screen.blit(score_msg, score_msg.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2)))
+            screen.blit(retry_text, retry_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 50)))
 
         pygame.display.flip()
         clock.tick(FPS)
