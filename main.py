@@ -3,7 +3,7 @@ import sys
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '0.1.0'
+__version__ = '0.2.0' # 버전 업데이트!
 __author__ = 'Python Developer'
 
 # --- 설정 상수 ---
@@ -24,6 +24,7 @@ BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
+DARK_GRAY = (50, 50, 50) # 점수판 색상
 
 # --- 클래스 정의 ---
 
@@ -64,16 +65,10 @@ class Ball:
     def move(self):
         self.rect.x += self.dx
         self.rect.y += self.dy
-
-        # 벽 충돌 (좌우)
         if self.rect.left <= 0 or self.rect.right >= SCREEN_WIDTH:
             self.dx *= -1
-        
-        # 벽 충돌 (상단)
         if self.rect.top <= 0:
             self.dy *= -1
-            
-        # 바닥에 떨어짐 (Game Over 체크용)
         if self.rect.bottom >= SCREEN_HEIGHT:
             return False 
         return True 
@@ -96,11 +91,11 @@ class Brick:
 def main():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    
-    # 윈도우 제목에 버전 표시
     pygame.display.set_caption(f"{__title__} v{__version__}")
-    
     clock = pygame.time.Clock()
+
+    # [1] 폰트 설정
+    score_font = pygame.font.SysFont(None, 36)
 
     paddle = Paddle()
     ball = Ball()
@@ -111,6 +106,9 @@ def main():
             brick_x = 15 + col * (BRICK_WIDTH + 5)
             brick_y = 15 + row * (BRICK_HEIGHT + 5)
             bricks.append(Brick(brick_x, brick_y))
+    
+    # [2] 점수 변수
+    score = 0
 
     running = True
     while running:
@@ -121,8 +119,10 @@ def main():
         paddle.move()
         
         if not ball.move():
-            print("Game Over!")
+            print(f"Game Over! Final Score: {score}")
             ball.reset()
+            score = 0 # 점수 초기화
+            for brick in bricks: brick.active = True
         
         if ball.rect.colliderect(paddle.rect):
             ball.dy *= -1
@@ -131,6 +131,8 @@ def main():
             if brick.active and ball.rect.colliderect(brick.rect):
                 brick.active = False
                 ball.dy *= -1 
+                # [3] 점수 증가
+                score += 10
                 break 
 
         if all(not brick.active for brick in bricks):
@@ -143,6 +145,10 @@ def main():
         ball.draw(screen)
         for brick in bricks:
             brick.draw(screen)
+
+        # [4] 점수 그리기
+        score_text = score_font.render(f"Score: {score}", True, DARK_GRAY)
+        screen.blit(score_text, (10, 10))
 
         pygame.display.flip()
         clock.tick(FPS)
