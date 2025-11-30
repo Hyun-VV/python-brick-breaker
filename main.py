@@ -4,7 +4,7 @@ import random
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '0.4.3' # 과거 위치 추적 물리 엔진 적용
+__version__ = '1.0.0' # 정식 배포 버전
 __author__ = 'Python Developer'
 
 # --- 설정 상수 ---
@@ -26,6 +26,18 @@ RED = (255, 0, 0)
 BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
 DARK_GRAY = (50, 50, 50)
+
+# --- 헬퍼 함수 ---
+
+def create_bricks():
+    """초기 벽돌 배치를 생성하여 리스트로 반환합니다."""
+    new_bricks = []
+    for row in range(BRICK_ROWS):
+        for col in range(BRICK_COLS):
+            brick_x = 15 + col * (BRICK_WIDTH + 5)
+            brick_y = 15 + row * (BRICK_HEIGHT + 5)
+            new_bricks.append(Brick(brick_x, brick_y))
+    return new_bricks
 
 # --- 클래스 정의 ---
 
@@ -60,26 +72,28 @@ class Ball:
             BALL_RADIUS * 2,
             BALL_RADIUS * 2
         )
-        # [핵심] 이전 프레임의 위치를 저장할 변수
+        # 물리 계산을 위한 이전 프레임 위치 저장
         self.prev_rect = self.rect.copy()
         
-        # [버그 수정] 속도 제한으로 터널링 방지
-        base_speed = min(4 + level, 6)  # 최대 속도를 6으로 제한 (패들 높이보다 작게)
+        # 속도 설정 (최대 속도를 6으로 제한하여 터널링 방지)
+        base_speed = min(4 + level, 6)
         self.dx = random.choice([-base_speed, base_speed]) 
         self.dy = -base_speed 
 
     def move(self):
-        # 움직이기 전에 현재 위치를 '과거 위치'로 저장
+        # 이동 전 현재 위치 저장
         self.prev_rect = self.rect.copy()
         
         self.rect.x += self.dx
         self.rect.y += self.dy
         
+        # 벽 충돌 처리
         if self.rect.left <= 0 or self.rect.right >= SCREEN_WIDTH:
             self.dx *= -1
         if self.rect.top <= 0:
             self.dy *= -1
             
+        # 바닥 충돌 (게임 오버)
         if self.rect.bottom >= SCREEN_HEIGHT:
             return False 
         return True 
@@ -105,23 +119,15 @@ def main():
     pygame.display.set_caption(f"{__title__} v{__version__}")
     clock = pygame.time.Clock()
 
+    # 폰트 설정
     score_font = pygame.font.SysFont(None, 36)
     title_font = pygame.font.SysFont(None, 80)
     sub_font = pygame.font.SysFont(None, 40)
 
+    # 객체 생성
     paddle = Paddle()
     ball = Ball()
-    
-    def create_bricks():
-        new_bricks = []
-        for row in range(BRICK_ROWS):
-            for col in range(BRICK_COLS):
-                brick_x = 15 + col * (BRICK_WIDTH + 5)
-                brick_y = 15 + row * (BRICK_HEIGHT + 5)
-                new_bricks.append(Brick(brick_x, brick_y))
-        return new_bricks
-
-    bricks = create_bricks()
+    bricks = create_bricks() # 함수 분리로 깔끔해짐
     
     score = 0
     level = 1
@@ -129,6 +135,7 @@ def main():
 
     running = True
     while running:
+        # 1. 이벤트 처리
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -137,9 +144,11 @@ def main():
                 if game_state == 'START':
                     if event.key == pygame.K_SPACE:
                         game_state = 'PLAYING'
+                
                 elif game_state == 'PLAYING':
-                    if event.key == pygame.K_c: 
+                    if event.key == pygame.K_c: # 개발자 치트키
                          for brick in bricks: brick.active = False
+                
                 elif game_state == 'GAME_OVER':
                     if event.key == pygame.K_SPACE:
                         score = 0
@@ -150,6 +159,7 @@ def main():
 
         screen.fill(WHITE)
 
+        # 2. 상태별 로직 및 그리기
         if game_state == 'START':
             title_text = title_font.render("BRICK BREAKER", True, BLUE)
             start_text = sub_font.render("Press SPACE to Start", True, BLACK)
@@ -162,75 +172,71 @@ def main():
             if not ball.move():
                 game_state = 'GAME_OVER' 
             
-            # [패들 충돌 로직 개선 - 정확한 반사 처리]
+            # --- 패들 충돌 처리 ---
             if ball.rect.colliderect(paddle.rect):
-                # 터널링 방지: 이전 프레임에서 이미 겹쳐있었는지 확인
+                # 이전 프레임 위치를 확인하여 터널링 방지
                 if not ball.prev_rect.colliderect(paddle.rect):
-                    # 새로운 충돌 -> 반사 처리
-                    # 공이 패들 위에 있으면 (y축으로 대부분 겹치면) 위에서 반사
+                    # 공이 위에서 내려올 때 (y축 중심 비교)
                     if ball.rect.centery < paddle.rect.centery:
-                        # 패들 윗면에서 반사
-                        ball.dy = -abs(ball.dy)  # 음수로 설정 (위로 튕김)
-                        ball.rect.bottom = paddle.rect.top  # 위치 보정
+                        ball.dy = -abs(ball.dy) # 무조건 위로 반사
+                        ball.rect.bottom = paddle.rect.top 
                     else:
-                        # 패들 옆면에서 반사
+                        # 옆면 충돌
                         ball.dx *= -1
                         if ball.rect.centerx < paddle.rect.centerx:
                              ball.rect.right = paddle.rect.left
                         else:
                              ball.rect.left = paddle.rect.right
 
-            # [벽돌 충돌 로직 개선 - 관통 슛 버그 및 동시 충돌 무시 버그 해결]
-            collided_bricks = []  # 이번 프레임에 충돌 처리한 벽돌들
+            # --- 벽돌 충돌 처리 ---
+            collided_bricks = []
             for brick in bricks:
                 if brick.active and ball.rect.colliderect(brick.rect):
-                    # [버그 수정] 이미 충돌 처리된 벽돌인지 확인 (동시 충돌 무시 해결)
+                    # 이미 처리된 벽돌이거나, 이전 프레임부터 겹쳐있던 경우 무시
                     if brick in collided_bricks:
                         continue
-                    
-                    # [버그 수정] 관통 슛 버그: 이전 프레임에서 벽돌과 겹쳐있었는지 확인
                     if ball.prev_rect.colliderect(brick.rect):
-                        # 이미 겹쳐있던 상태 -> 새로운 충돌이 아님 (무시)
                         continue
                     
                     brick.active = False
                     collided_bricks.append(brick)
                     score += 10 + (level * 2)
                     
-                    # [핵심 로직 개선] 겹침 거리로 정확한 충돌 면 판단
-                    # 충돌 표면 계산 (어느 면과 충돌했는지 정확히 판정)
-                    # 겹침 정도(penetration depth)를 각 방향별로 계산
-                    overlap_top = ball.rect.bottom - brick.rect.top      # 위쪽 면
-                    overlap_bottom = brick.rect.bottom - ball.rect.top   # 아래쪽 면
-                    overlap_left = ball.rect.right - brick.rect.left     # 왼쪽 면
-                    overlap_right = brick.rect.right - ball.rect.left    # 오른쪽 면
+                    # 겹침 깊이(penetration depth) 계산으로 정확한 충돌 면 판정
+                    overlap_top = ball.rect.bottom - brick.rect.top
+                    overlap_bottom = brick.rect.bottom - ball.rect.top
+                    overlap_left = ball.rect.right - brick.rect.left
+                    overlap_right = brick.rect.right - ball.rect.left
                     
-                    # 가장 적은 겹침이 발생한 면이 실제 충돌한 면
                     min_overlap = min(overlap_top, overlap_bottom, overlap_left, overlap_right)
                     
-                    if min_overlap == overlap_top and ball.dy > 0:  # 위에서 진입
+                    if min_overlap == overlap_top and ball.dy > 0:
                         ball.dy *= -1
                         ball.rect.bottom = brick.rect.top
-                    elif min_overlap == overlap_bottom and ball.dy < 0:  # 아래에서 진입
+                    elif min_overlap == overlap_bottom and ball.dy < 0:
                         ball.dy *= -1
                         ball.rect.top = brick.rect.bottom
-                    elif min_overlap == overlap_left and ball.dx > 0:  # 왼쪽에서 진입
+                    elif min_overlap == overlap_left and ball.dx > 0:
                         ball.dx *= -1
                         ball.rect.right = brick.rect.left
-                    elif min_overlap == overlap_right and ball.dx < 0:  # 오른쪽에서 진입
+                    elif min_overlap == overlap_right and ball.dx < 0:
                         ball.dx *= -1
                         ball.rect.left = brick.rect.right
 
+            # 스테이지 클리어 체크
             if all(not brick.active for brick in bricks):
                 screen.fill(WHITE)
                 clear_text = title_font.render(f"STAGE {level} CLEAR!", True, BLUE)
                 screen.blit(clear_text, clear_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2)))
                 pygame.display.flip()
+                
                 pygame.time.delay(2000)
+                
                 level += 1
                 ball.reset(level)
                 bricks = create_bricks() 
 
+            # 화면 그리기
             paddle.draw(screen)
             ball.draw(screen)
             for brick in bricks: brick.draw(screen)
