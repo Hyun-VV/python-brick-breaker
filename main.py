@@ -6,7 +6,7 @@ import os
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.4.1'  #종합적 오류 수정
+__version__ = '1.4.2'  # 상단 UI 디자인 리뉴얼 (헤더 바 추가) & 벽돌 위치 하향
 __author__ = 'Python Developer'
 
 # --- 설정 상수 ---
@@ -29,6 +29,8 @@ BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
 DARK_GRAY = (50, 50, 50)
 ORANGE = (255, 165, 0)
+YELLOW = (255, 255, 0)
+HEADER_BG = (30, 30, 30) # 상단 상태바 배경색 (아주 진한 회색)
 
 # 게임 설정
 INITIAL_LIVES = 3
@@ -51,11 +53,14 @@ def create_bricks():
     new_bricks = []
     total_bricks_width = BRICK_COLS * (BRICK_WIDTH + 5) - 5
     start_x = (SCREEN_WIDTH - total_bricks_width) // 2
+    
+    # [수정] 상단 UI(헤더) 공간 확보를 위해 벽돌 시작 위치를 80으로 내림
+    start_y = 80 
 
     for row in range(BRICK_ROWS):
         for col in range(BRICK_COLS):
             brick_x = start_x + col * (BRICK_WIDTH + 5)
-            brick_y = 15 + row * (BRICK_HEIGHT + 5)
+            brick_y = start_y + row * (BRICK_HEIGHT + 5)
             new_bricks.append(Brick(brick_x, brick_y))
     return new_bricks
 
@@ -128,6 +133,9 @@ class Ball:
             self.dx *= -1
             self.rect.right = SCREEN_WIDTH
         
+        # [수정] 천장 충돌 (상단 바 60px 아래에서 튕기는 게 아니라, 천장은 0좌표로 유지)
+        # (공이 UI바 위로 올라가도 상관없으면 0, UI바 밑에서 튕기게 하려면 60)
+        # 보통은 UI 위로 공이 지나가도 되므로 0으로 둡니다.
         if self.rect.top <= 0:
             self.dy *= -1
             self.rect.top = 0
@@ -176,6 +184,10 @@ def main():
     clock = pygame.time.Clock()
 
     # 폰트 설정
+    # [추가] 상단 UI 전용 폰트
+    ui_font_bold = pygame.font.SysFont(None, 45)  # 점수용 (크고 굵게)
+    ui_font_small = pygame.font.SysFont(None, 30) # 레벨/라이브용 (작게)
+    
     score_font = pygame.font.SysFont(None, 36)
     title_font = pygame.font.SysFont(None, 80)
     sub_font = pygame.font.SysFont(None, 40)
@@ -194,7 +206,6 @@ def main():
     menu_selection = 0
     pause_selection = 0 
     
-    # 일시정지 전 상태를 기억하는 변수
     pre_pause_state = 'PLAYING' 
     
     powerups = []
@@ -226,7 +237,6 @@ def main():
                             running = False
                 
                 elif game_state == 'INSTRUCTIONS':
-                    # [수정] SPACE 키로 뒤로 가는 기능 삭제 (오직 ESC만 동작)
                     if event.key == pygame.K_ESCAPE:
                         game_state = 'MAIN_MENU'
                         menu_selection = 0
@@ -307,10 +317,7 @@ def main():
                                 running = False
                     
                     elif game_state == 'INSTRUCTIONS':
-                        if SCREEN_WIDTH/2 - 300 < mouse_x < SCREEN_WIDTH/2 + 300 and \
-                           SCREEN_HEIGHT - 50 < mouse_y < SCREEN_HEIGHT - 10:
-                            game_state = 'MAIN_MENU'
-                            menu_selection = 0
+                        pass
                     
                     elif game_state == 'PAUSE':
                         if SCREEN_WIDTH/2 - 150 < mouse_x < SCREEN_WIDTH/2 + 150:
@@ -396,7 +403,7 @@ def main():
                 desc_text = korean_font.render(description, True, DARK_GRAY)
                 screen.blit(desc_text, (70, current_y - 2))
                 current_y += line_height
-            
+
         elif game_state == 'START':
             powerups.clear()
             title_text = title_font.render("BRICK BREAKER", True, BLUE)
@@ -421,8 +428,26 @@ def main():
             ball.draw(screen)
             for brick in bricks: brick.draw(screen)
             for powerup in powerups: powerup.draw(screen)
-            score_text = score_font.render(f"Score: {score}  Level: {level}  Lives: {lives}", True, DARK_GRAY)
-            screen.blit(score_text, (10, 10))
+            
+            # [수정] 상단바 UI 그리기 (READY 상태)
+            # 1. 헤더 배경 (검은색 바)
+            pygame.draw.rect(screen, HEADER_BG, (0, 0, SCREEN_WIDTH, 60))
+            
+            # 2. LEVEL (좌측)
+            level_str = f"LEVEL {level}"
+            level_text = ui_font_small.render(level_str, True, WHITE)
+            screen.blit(level_text, (20, 18))
+
+            # 3. SCORE (중앙)
+            score_str = f"SCORE: {score}"
+            score_text = ui_font_bold.render(score_str, True, YELLOW)
+            screen.blit(score_text, score_text.get_rect(center=(SCREEN_WIDTH/2, 30)))
+
+            # 4. LIVES (우측)
+            lives_str = f"LIVES: {lives}"
+            lives_text = ui_font_small.render(lives_str, True, RED)
+            lives_rect = lives_text.get_rect(right=SCREEN_WIDTH - 20, top=18)
+            screen.blit(lives_text, lives_rect)
 
         elif game_state == 'PLAYING':
             paddle.move()
@@ -542,17 +567,34 @@ def main():
             for brick in bricks: brick.draw(screen)
             for powerup in powerups: powerup.draw(screen)
             
-            multiplier_text = ""
-            if score_multiplier == 2:
-                multiplier_text = " [x2 SCORE]"
-                multiplier_seconds = (score_multiplier_timer + 29) // 30
+            # [수정] 상단바 UI 그리기 (PLAYING 상태)
+            pygame.draw.rect(screen, HEADER_BG, (0, 0, SCREEN_WIDTH, 60))
             
-            score_text = score_font.render(f"Score: {score}  Level: {level}  Lives: {lives}{multiplier_text}", True, DARK_GRAY)
-            screen.blit(score_text, (10, 10))
-            
+            # LEVEL (좌측)
+            level_str = f"LEVEL {level}"
+            level_text = ui_font_small.render(level_str, True, WHITE)
+            screen.blit(level_text, (20, 18))
+
+            # SCORE (중앙) - 배수 적용 시 텍스트 변경
+            score_str = f"SCORE: {score}"
             if score_multiplier == 2:
-                timer_text = score_font.render(f"x2 Score: {multiplier_seconds}s", True, ORANGE)
-                screen.blit(timer_text, (10, 50))
+                score_str += " (x2)"
+            
+            score_color = YELLOW if score_multiplier == 1 else ORANGE
+            score_text = ui_font_bold.render(score_str, True, score_color)
+            screen.blit(score_text, score_text.get_rect(center=(SCREEN_WIDTH/2, 30)))
+
+            # LIVES (우측)
+            lives_str = f"LIVES: {lives}"
+            lives_text = ui_font_small.render(lives_str, True, RED)
+            lives_rect = lives_text.get_rect(right=SCREEN_WIDTH - 20, top=18)
+            screen.blit(lives_text, lives_rect)
+            
+            # 파워업 타이머 표시 (헤더 바 아래쪽에 작게 표시)
+            if score_multiplier == 2:
+                timer_seconds = (score_multiplier_timer + 59) // 60
+                timer_text = ui_font_small.render(f"Double Score: {timer_seconds}s", True, ORANGE)
+                screen.blit(timer_text, (SCREEN_WIDTH/2 - 60, 65))
 
         elif game_state == 'PAUSE':
             pause_overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -587,7 +629,7 @@ def main():
             
             over_text = title_font.render("GAME OVER", True, RED)
             score_msg = sub_font.render(f"Final Score: {score}", True, BLACK)
-            highscore_msg = score_font.render(f"High Score: {highscore}", True, ORANGE)
+            highscore_msg = sub_font.render(f"High Score: {highscore}", True, ORANGE)
             lives_msg = score_font.render(f"Lives Remaining: {lives}", True, RED)
             retry_text = sub_font.render("Press SPACE to Start", True, DARK_GRAY)
             screen.blit(over_text, over_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 80)))
