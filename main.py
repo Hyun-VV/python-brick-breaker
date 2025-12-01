@@ -6,7 +6,7 @@ import os
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.4.0'  # 마우스 호버(Hover) 기능 추가
+__version__ = '1.4.1'  #종합적 오류 수정
 __author__ = 'Python Developer'
 
 # --- 설정 상수 ---
@@ -194,6 +194,9 @@ def main():
     menu_selection = 0
     pause_selection = 0 
     
+    # 일시정지 전 상태를 기억하는 변수
+    pre_pause_state = 'PLAYING' 
+    
     powerups = []
     score_multiplier = 1
     paddle_width_timer = 0
@@ -202,7 +205,6 @@ def main():
 
     running = True
     while running:
-        # [공통] 현재 마우스 위치 가져오기
         mouse_pos = pygame.mouse.get_pos()
 
         for event in pygame.event.get():
@@ -222,11 +224,10 @@ def main():
                             game_state = 'INSTRUCTIONS'
                         elif menu_selection == 2:
                             running = False
-                    elif event.key == pygame.K_ESCAPE:
-                        running = False
                 
                 elif game_state == 'INSTRUCTIONS':
-                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_SPACE:
+                    # [수정] SPACE 키로 뒤로 가는 기능 삭제 (오직 ESC만 동작)
+                    if event.key == pygame.K_ESCAPE:
                         game_state = 'MAIN_MENU'
                         menu_selection = 0
                 
@@ -241,6 +242,7 @@ def main():
                     if event.key == pygame.K_SPACE:
                         game_state = 'PLAYING'
                     elif event.key == pygame.K_ESCAPE: 
+                        pre_pause_state = 'READY'
                         game_state = 'PAUSE'
                         pause_selection = 0
                 
@@ -248,6 +250,7 @@ def main():
                     if event.key == pygame.K_c:
                          for brick in bricks: brick.active = False
                     elif event.key == pygame.K_ESCAPE:
+                         pre_pause_state = 'PLAYING'
                          game_state = 'PAUSE'
                          pause_selection = 0
                 
@@ -258,7 +261,7 @@ def main():
                         pause_selection = (pause_selection + 1) % 3
                     elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
                         if pause_selection == 0: # RESUME
-                            game_state = 'PLAYING'
+                            game_state = pre_pause_state
                         elif pause_selection == 1: # MAIN MENU
                             score = 0
                             level = 1
@@ -272,7 +275,7 @@ def main():
                         elif pause_selection == 2: # QUIT GAME
                             running = False
                     elif event.key == pygame.K_ESCAPE:
-                         game_state = 'PLAYING'
+                         game_state = pre_pause_state
                 
                 elif game_state == 'GAME_OVER':
                     if event.key == pygame.K_SPACE:
@@ -290,13 +293,11 @@ def main():
                         game_state = 'MAIN_MENU'
                         menu_selection = 0
             
-            # 마우스 클릭 이벤트
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     mouse_x, mouse_y = event.pos
                     
                     if game_state == 'MAIN_MENU':
-                        # 클릭으로도 메뉴 선택 가능 (좌표 기반)
                         if SCREEN_WIDTH/2 - 200 < mouse_x < SCREEN_WIDTH/2 + 200:
                             if SCREEN_HEIGHT/2 - 60 < mouse_y < SCREEN_HEIGHT/2 + 10:
                                 game_state = 'START'
@@ -312,10 +313,9 @@ def main():
                             menu_selection = 0
                     
                     elif game_state == 'PAUSE':
-                        # 일시정지 클릭
                         if SCREEN_WIDTH/2 - 150 < mouse_x < SCREEN_WIDTH/2 + 150:
                             if SCREEN_HEIGHT/2 - 40 < mouse_y < SCREEN_HEIGHT/2 + 10:
-                                game_state = 'PLAYING'
+                                game_state = pre_pause_state
                             elif SCREEN_HEIGHT/2 + 20 < mouse_y < SCREEN_HEIGHT/2 + 70:
                                 score = 0
                                 level = 1
@@ -338,20 +338,14 @@ def main():
             menu_y_positions = [SCREEN_HEIGHT/2 - 20, SCREEN_HEIGHT/2 + 55, SCREEN_HEIGHT/2 + 130]
             
             for i, item in enumerate(menu_items):
-                # 마우스 호버 감지
                 btn_rect = pygame.Rect(SCREEN_WIDTH/2 - 200, menu_y_positions[i] - 30, 400, 60)
                 if btn_rect.collidepoint(mouse_pos):
                     menu_selection = i
                 
-                # [수정] 메인 메뉴 글자 색상 수정 (WHITE -> DARK_GRAY)
-                # 선택되면 ORANGE, 아니면 DARK_GRAY (흰색 배경이라서)
                 color = ORANGE if i == menu_selection else DARK_GRAY
-                
-                # 텍스트 그리기
                 menu_text = sub_font.render(item, True, color)
                 text_rect = menu_text.get_rect(center=(SCREEN_WIDTH/2, menu_y_positions[i]))
                 
-                # 버튼 테두리 그리기
                 if i == menu_selection:
                     pygame.draw.rect(screen, WHITE, (text_rect.left - 20, text_rect.top - 10, text_rect.width + 40, text_rect.height + 20))
                     pygame.draw.rect(screen, ORANGE, (text_rect.left - 20, text_rect.top - 10, text_rect.width + 40, text_rect.height + 20), 3)
@@ -403,9 +397,6 @@ def main():
                 screen.blit(desc_text, (70, current_y - 2))
                 current_y += line_height
             
-            hint_text = korean_font.render("ESC 또는 SPACE로 메뉴로 돌아가기", True, ORANGE)
-            screen.blit(hint_text, hint_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT - 30)))
-
         elif game_state == 'START':
             powerups.clear()
             title_text = title_font.render("BRICK BREAKER", True, BLUE)
