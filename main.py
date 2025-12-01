@@ -6,7 +6,7 @@ import os
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.3.3'  #시작화면과 설명화면 추가
+__version__ = '1.3.4'  #시작화면과 설명화면 수정
 __author__ = 'Python Developer'
 
 # --- 설정 상수 ---
@@ -180,10 +180,10 @@ def main():
     pygame.display.set_caption(f"{__title__} v{__version__}")
     clock = pygame.time.Clock()
 
-    # 폰트 설정
-    score_font = pygame.font.SysFont(None, 36)
-    title_font = pygame.font.SysFont(None, 80)
-    sub_font = pygame.font.SysFont(None, 40)
+    # 폰트 설정 (한글 지원)
+    score_font = pygame.font.SysFont('gulim', 36)
+    title_font = pygame.font.SysFont('gulim', 80)
+    sub_font = pygame.font.SysFont('gulim', 40)
 
     # 객체 생성
     paddle = Paddle()
@@ -214,15 +214,8 @@ def main():
             
             if event.type == pygame.KEYDOWN:
                 if game_state == 'MAIN_MENU':
-                    if event.key == pygame.K_UP or event.key == pygame.K_w:
-                        menu_selection = 0
-                    elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
-                        menu_selection = 1
-                    elif event.key == pygame.K_SPACE or event.key == pygame.K_RETURN:
-                        if menu_selection == 0:
-                            game_state = 'START'
-                        elif menu_selection == 1:
-                            game_state = 'INSTRUCTIONS'
+                    if event.key == pygame.K_ESCAPE:
+                        game_state = 'START'
                 
                 elif game_state == 'INSTRUCTIONS':
                     if event.key == pygame.K_ESCAPE or event.key == pygame.K_SPACE:
@@ -265,6 +258,29 @@ def main():
                         bricks = create_bricks()
                         game_state = 'MAIN_MENU'
                         menu_selection = 0
+            
+            # 마우스 클릭 이벤트 처리
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # 좌클릭
+                    mouse_x, mouse_y = event.pos
+                    
+                    if game_state == 'MAIN_MENU':
+                        # START GAME 버튼 영역
+                        if SCREEN_WIDTH/2 - 200 < mouse_x < SCREEN_WIDTH/2 + 200 and \
+                           SCREEN_HEIGHT/2 - 60 < mouse_y < SCREEN_HEIGHT/2 + 10:
+                            game_state = 'START'
+                        
+                        # INSTRUCTIONS 버튼 영역
+                        if SCREEN_WIDTH/2 - 200 < mouse_x < SCREEN_WIDTH/2 + 200 and \
+                           SCREEN_HEIGHT/2 + 20 < mouse_y < SCREEN_HEIGHT/2 + 90:
+                            game_state = 'INSTRUCTIONS'
+                    
+                    elif game_state == 'INSTRUCTIONS':
+                        # 뒤로가기 버튼 (화면 아래)
+                        if SCREEN_WIDTH/2 - 300 < mouse_x < SCREEN_WIDTH/2 + 300 and \
+                           SCREEN_HEIGHT - 50 < mouse_y < SCREEN_HEIGHT - 10:
+                            game_state = 'MAIN_MENU'
+                            menu_selection = 0
 
         screen.fill(WHITE)
 
@@ -279,13 +295,12 @@ def main():
             menu_y_positions = [SCREEN_HEIGHT/2 - 20, SCREEN_HEIGHT/2 + 40]
             
             for i, item in enumerate(menu_items):
-                color = ORANGE if i == menu_selection else DARK_GRAY
-                prefix = "▶ " if i == menu_selection else "  "
-                menu_text = sub_font.render(prefix + item, True, color)
-                screen.blit(menu_text, menu_text.get_rect(center=(SCREEN_WIDTH/2, menu_y_positions[i])))
-            
-            hint_text = score_font.render("↑↓ 선택, SPACE 확인", True, DARK_GRAY)
-            screen.blit(hint_text, hint_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT - 60)))
+                menu_text = sub_font.render(item, True, ORANGE)
+                text_rect = menu_text.get_rect(center=(SCREEN_WIDTH/2, menu_y_positions[i]))
+                # 버튼 배경
+                pygame.draw.rect(screen, WHITE, (text_rect.left - 20, text_rect.top - 10, text_rect.width + 40, text_rect.height + 20))
+                pygame.draw.rect(screen, ORANGE, (text_rect.left - 20, text_rect.top - 10, text_rect.width + 40, text_rect.height + 20), 3)
+                screen.blit(menu_text, text_rect)
 
         elif game_state == 'INSTRUCTIONS':
             # 게임설명 화면
@@ -351,12 +366,10 @@ def main():
             start_text = sub_font.render("Press SPACE to Start", True, BLACK)
             lives_text = score_font.render(f"Lives: {INITIAL_LIVES}", True, RED)
             highscore_text = score_font.render(f"High Score: {highscore}", True, ORANGE)
-            menu_hint_text = score_font.render("ESC: 메뉴로 돌아가기", True, DARK_GRAY)
             screen.blit(title_text, title_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 50)))
             screen.blit(start_text, start_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 20)))
             screen.blit(lives_text, lives_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 80)))
             screen.blit(highscore_text, highscore_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 120)))
-            screen.blit(menu_hint_text, menu_hint_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT - 30)))
 
         elif game_state == 'READY':
             # 공이 패들 위에 고정된 상태에서 대기
