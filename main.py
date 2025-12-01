@@ -6,7 +6,7 @@ import os
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.3.6'  # 화면 너비 수정 및 UI 전환 효과 개선
+__version__ = '1.3.7'  # 준비 단계 패들 움직임 삭제
 __author__ = 'Python Developer'
 
 # --- 설정 상수 ---
@@ -360,7 +360,6 @@ def main():
             screen.blit(highscore_text, highscore_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 50)))
 
         elif game_state == 'READY':
-            paddle.move()
             ball.rect.centerx = paddle.rect.centerx
             ball.rect.bottom = paddle.rect.top
             
