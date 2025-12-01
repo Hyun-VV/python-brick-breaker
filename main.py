@@ -6,7 +6,7 @@ import os
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.3.1'  #보라색 파워업 시간 추가
+__version__ = '1.3.2'  #노란색 시간 추가
 __author__ = 'Python Developer'
 
 # --- 설정 상수 ---
@@ -202,6 +202,7 @@ def main():
     score_multiplier = 1
     paddle_width_timer = 0
     slow_ball_timer = 0  # 느린 공 지속시간
+    score_multiplier_timer = 0  # 점수 배수 지속시간
 
     running = True
     while running:
@@ -239,6 +240,7 @@ def main():
                         powerups = []  # 파워업 리스트 초기화
                         paddle_width_timer = 0
                         slow_ball_timer = 0  # 느린 공 타이머 초기화
+                        score_multiplier_timer = 0  # 점수 배수 타이머 초기화
                         ball.reset(level)
                         bricks = create_bricks()
                         game_state = 'START'
@@ -378,9 +380,9 @@ def main():
                         ball.dy *= 0.7
                         slow_ball_timer = POWERUP_DURATION  # 10초 지속
                     elif powerup.powerup_type == 'DOUBLE_SCORE':
-                        # 이 순간 얻는 점수에만 2배 적용
-                        score *= 2
-                        score_multiplier = 1  # 즉시 원래대로
+                        # 10초 동안 벽돌 점수 2배
+                        score_multiplier = 2
+                        score_multiplier_timer = POWERUP_DURATION
                     elif powerup.powerup_type == 'EXTRA_LIFE':
                         lives += 1
                     
@@ -400,6 +402,11 @@ def main():
                     # 느린 공 효과 해제 (원래 속도로 복구)
                     ball.dx /= 0.7
                     ball.dy /= 0.7
+            
+            if score_multiplier_timer > 0:
+                score_multiplier_timer -= 1
+                if score_multiplier_timer == 0:
+                    score_multiplier = 1  # 점수 배수 해제
 
             # 화면 그리기
             paddle.draw(screen)
@@ -407,8 +414,19 @@ def main():
             for brick in bricks: brick.draw(screen)
             for powerup in powerups: powerup.draw(screen)  # 파워업 그리기
             
-            score_text = score_font.render(f"Score: {score}  Level: {level}  Lives: {lives}", True, DARK_GRAY)
+            # 점수 배수 활성화 상태 표시
+            multiplier_text = ""
+            if score_multiplier == 2:
+                multiplier_text = " [x2 SCORE]"
+                multiplier_seconds = (score_multiplier_timer + 29) // 30  # 30fps 기준
+            
+            score_text = score_font.render(f"Score: {score}  Level: {level}  Lives: {lives}{multiplier_text}", True, DARK_GRAY)
             screen.blit(score_text, (10, 10))
+            
+            # 점수 배수 남은 시간 표시
+            if score_multiplier == 2:
+                timer_text = score_font.render(f"x2 Score: {multiplier_seconds}s", True, (255, 165, 0))  # 오렌지색
+                screen.blit(timer_text, (10, 50))
 
         elif game_state == 'PAUSE':
             # 게임 일시정지 화면
