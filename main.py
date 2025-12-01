@@ -6,11 +6,11 @@ import os
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.3.5'  #시작화면과 설명화면 폰트 수정
+__version__ = '1.3.6'  # 화면 너비 수정 및 UI 전환 효과 개선
 __author__ = 'Python Developer'
 
 # --- 설정 상수 ---
-SCREEN_WIDTH = 800
+SCREEN_WIDTH = 825  # [수정] 800 -> 825
 SCREEN_HEIGHT = 600
 PADDLE_WIDTH = 100
 PADDLE_HEIGHT = 10
@@ -28,7 +28,7 @@ RED = (255, 0, 0)
 BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
 DARK_GRAY = (50, 50, 50)
-ORANGE = (255, 165, 0)  # 밝은 주황색 (노란색보다 가시성 좋음)
+ORANGE = (255, 165, 0)
 
 # 게임 설정
 INITIAL_LIVES = 3
@@ -37,27 +37,31 @@ HIGHSCORE_FILE = "highscore.json"
 # 파워업 타입
 POWERUP_TYPES = ['WIDE_PADDLE', 'SLOW_BALL', 'DOUBLE_SCORE', 'EXTRA_LIFE']
 POWERUP_COLORS = {
-    'WIDE_PADDLE': (0, 200, 255),   # 밝은 파란색
-    'SLOW_BALL': (200, 100, 255),   # 보라색
-    'DOUBLE_SCORE': (255, 200, 0),  # 주황색
-    'EXTRA_LIFE': (255, 100, 100)   # 분홍색
+    'WIDE_PADDLE': (0, 200, 255),
+    'SLOW_BALL': (200, 100, 255),
+    'DOUBLE_SCORE': (255, 200, 0),
+    'EXTRA_LIFE': (255, 100, 100)
 }
-POWERUP_DURATION = 300  # 10초 (60 FPS 기준)
+POWERUP_DURATION = 300  # 10초
 
 # --- 헬퍼 함수 ---
 
 def create_bricks():
     """초기 벽돌 배치를 생성하여 리스트로 반환합니다."""
     new_bricks = []
+    # 화면 너비가 바뀌었으므로 벽돌 배치 중앙 정렬을 위해 여백 계산
+    # (선택 사항: 꽉 채우려면 BRICK_COLS를 늘리거나 BRICK_WIDTH를 조정해야 함. 현재는 중앙 정렬 유지)
+    total_bricks_width = BRICK_COLS * (BRICK_WIDTH + 5) - 5
+    start_x = (SCREEN_WIDTH - total_bricks_width) // 2
+
     for row in range(BRICK_ROWS):
         for col in range(BRICK_COLS):
-            brick_x = 15 + col * (BRICK_WIDTH + 5)
+            brick_x = start_x + col * (BRICK_WIDTH + 5)
             brick_y = 15 + row * (BRICK_HEIGHT + 5)
             new_bricks.append(Brick(brick_x, brick_y))
     return new_bricks
 
 def load_highscore():
-    """저장된 하이스코어를 불러옥니다."""
     if os.path.exists(HIGHSCORE_FILE):
         try:
             with open(HIGHSCORE_FILE, 'r') as f:
@@ -68,7 +72,6 @@ def load_highscore():
     return 0
 
 def save_highscore(score):
-    """하이스코어를 저장합니다."""
     try:
         with open(HIGHSCORE_FILE, 'w') as f:
             json.dump({'highscore': score}, f)
@@ -108,34 +111,29 @@ class Ball:
             BALL_RADIUS * 2,
             BALL_RADIUS * 2
         )
-        # 물리 계산을 위한 이전 프레임 위치 저장
         self.prev_rect = self.rect.copy()
         
-        # 속도 설정 (최대 속도를 6으로 제한하여 터널링 방지)
         base_speed = min(4 + level, 6)
         self.dx = random.choice([-base_speed, base_speed]) 
         self.dy = -base_speed 
 
     def move(self):
-        # 이동 전 현재 위치 저장
         self.prev_rect = self.rect.copy()
         
         self.rect.x += self.dx
         self.rect.y += self.dy
         
-        # 벽 충돌 처리 (위치 보정 추가)
         if self.rect.left <= 0:
             self.dx *= -1
-            self.rect.left = 0  # 위치 보정
+            self.rect.left = 0
         elif self.rect.right >= SCREEN_WIDTH:
             self.dx *= -1
-            self.rect.right = SCREEN_WIDTH  # 위치 보정
+            self.rect.right = SCREEN_WIDTH
         
         if self.rect.top <= 0:
             self.dy *= -1
-            self.rect.top = 0  # 위치 보정
+            self.rect.top = 0
             
-        # 바닥 충돌 (게임 오버)
         if self.rect.bottom >= SCREEN_HEIGHT:
             return False 
         return True 
@@ -163,7 +161,6 @@ class PowerUp:
     
     def move(self):
         self.rect.y += self.speed
-        # 화면 아래로 나가면 제거
         if self.rect.top > SCREEN_HEIGHT:
             self.active = False
     
@@ -180,36 +177,33 @@ def main():
     pygame.display.set_caption(f"{__title__} v{__version__}")
     clock = pygame.time.Clock()
 
-    # 폰트 설정 (기본 폰트 + 한글 폰트)
+    # 폰트 설정
     score_font = pygame.font.SysFont(None, 36)
     title_font = pygame.font.SysFont(None, 80)
     sub_font = pygame.font.SysFont(None, 40)
-    korean_title_font = pygame.font.SysFont('malgungothic', 40)  # 한글 제목 폰트
-    korean_font = pygame.font.SysFont('malgungothic', 28)  # 한글 설명 폰트 (작은 크기)
+    korean_title_font = pygame.font.SysFont('malgungothic', 40)
+    korean_font = pygame.font.SysFont('malgungothic', 28)
 
-    # 객체 생성
     paddle = Paddle()
     ball = Ball()
-    bricks = create_bricks() # 함수 분리로 깔끔해짐
+    bricks = create_bricks()
     
     score = 0
     level = 1
     lives = INITIAL_LIVES
-    highscore = load_highscore()  # 하이스코어 로드
-    game_state = 'MAIN_MENU'  # MAIN_MENU, INSTRUCTIONS, START, READY, PLAYING, PAUSE, GAME_OVER
-    menu_selection = 0  # 0: 게임시작, 1: 게임설명
+    highscore = load_highscore()
+    game_state = 'MAIN_MENU'
+    menu_selection = 0
     
-    # 파워업 관련 변수
+    # 파워업 변수
     powerups = []
-    paddle_width = PADDLE_WIDTH
     score_multiplier = 1
     paddle_width_timer = 0
-    slow_ball_timer = 0  # 느린 공 지속시간
-    score_multiplier_timer = 0  # 점수 배수 지속시간
+    slow_ball_timer = 0
+    score_multiplier_timer = 0
 
     running = True
     while running:
-        # 1. 이벤트 처리
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -236,13 +230,13 @@ def main():
                         game_state = 'PLAYING'
                 
                 elif game_state == 'PLAYING':
-                    if event.key == pygame.K_c: # 개발자 치트키
+                    if event.key == pygame.K_c:
                          for brick in bricks: brick.active = False
-                    elif event.key == pygame.K_ESCAPE: # 일시정지
+                    elif event.key == pygame.K_ESCAPE:
                          game_state = 'PAUSE'
                 
                 elif game_state == 'PAUSE':
-                    if event.key == pygame.K_ESCAPE: # 일시정지 해제
+                    if event.key == pygame.K_ESCAPE:
                          game_state = 'PLAYING'
                 
                 elif game_state == 'GAME_OVER':
@@ -250,35 +244,32 @@ def main():
                         score = 0
                         level = 1
                         lives = INITIAL_LIVES
-                        paddle.rect.width = PADDLE_WIDTH  # 패들 크기 초기화
-                        score_multiplier = 1  # 점수 배수 초기화
-                        powerups = []  # 파워업 리스트 초기화
+                        paddle.rect.width = PADDLE_WIDTH
+                        score_multiplier = 1
+                        powerups = []
                         paddle_width_timer = 0
-                        slow_ball_timer = 0  # 느린 공 타이머 초기화
-                        score_multiplier_timer = 0  # 점수 배수 타이머 초기화
+                        slow_ball_timer = 0
+                        score_multiplier_timer = 0
                         ball.reset(level)
                         bricks = create_bricks()
                         game_state = 'MAIN_MENU'
                         menu_selection = 0
             
-            # 마우스 클릭 이벤트 처리
+            # 마우스 클릭 이벤트
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # 좌클릭
+                if event.button == 1:
                     mouse_x, mouse_y = event.pos
                     
                     if game_state == 'MAIN_MENU':
-                        # START GAME 버튼 영역
                         if SCREEN_WIDTH/2 - 200 < mouse_x < SCREEN_WIDTH/2 + 200 and \
                            SCREEN_HEIGHT/2 - 60 < mouse_y < SCREEN_HEIGHT/2 + 10:
                             game_state = 'START'
                         
-                        # INSTRUCTIONS 버튼 영역
                         if SCREEN_WIDTH/2 - 200 < mouse_x < SCREEN_WIDTH/2 + 200 and \
                            SCREEN_HEIGHT/2 + 20 < mouse_y < SCREEN_HEIGHT/2 + 90:
                             game_state = 'INSTRUCTIONS'
                     
                     elif game_state == 'INSTRUCTIONS':
-                        # 뒤로가기 버튼 (화면 아래)
                         if SCREEN_WIDTH/2 - 300 < mouse_x < SCREEN_WIDTH/2 + 300 and \
                            SCREEN_HEIGHT - 50 < mouse_y < SCREEN_HEIGHT - 10:
                             game_state = 'MAIN_MENU'
@@ -288,33 +279,29 @@ def main():
 
         # 2. 상태별 로직 및 그리기
         if game_state == 'MAIN_MENU':
-            # 메인 메뉴 화면
+            # 메인 메뉴 제목 (위치 고정)
             title_text = title_font.render("BRICK BREAKER", True, BLUE)
-            screen.blit(title_text, title_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 120)))
+            # [핵심] Y좌표를 SCREEN_HEIGHT/2 - 150 으로 설정
+            screen.blit(title_text, title_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 150)))
             
-            # 메뉴 항목 렌더링
             menu_items = ["START GAME", "INSTRUCTIONS"]
             menu_y_positions = [SCREEN_HEIGHT/2 - 20, SCREEN_HEIGHT/2 + 40]
             
             for i, item in enumerate(menu_items):
                 menu_text = sub_font.render(item, True, ORANGE)
                 text_rect = menu_text.get_rect(center=(SCREEN_WIDTH/2, menu_y_positions[i]))
-                # 버튼 배경
                 pygame.draw.rect(screen, WHITE, (text_rect.left - 20, text_rect.top - 10, text_rect.width + 40, text_rect.height + 20))
                 pygame.draw.rect(screen, ORANGE, (text_rect.left - 20, text_rect.top - 10, text_rect.width + 40, text_rect.height + 20), 3)
                 screen.blit(menu_text, text_rect)
 
         elif game_state == 'INSTRUCTIONS':
-            # 게임설명 화면
             title_text = title_font.render("GAME INSTRUCTIONS", True, BLUE)
             screen.blit(title_text, title_text.get_rect(center=(SCREEN_WIDTH/2, 30)))
             
-            # 텍스트 위치 설정
             start_y = 80
             line_height = 35
             current_y = start_y
             
-            # 조작법 섹션
             control_title = score_font.render("KEYBOARD CONTROLS", True, BLUE)
             screen.blit(control_title, (20, current_y))
             current_y += line_height + 5
@@ -332,12 +319,10 @@ def main():
             
             current_y += 10
             
-            # 파워업 섹션
             powerup_title = score_font.render("POWER-UPS", True, BLUE)
             screen.blit(powerup_title, (20, current_y))
             current_y += line_height + 5
             
-            # 파워업 정보
             powerup_info = [
                 ('WIDE_PADDLE', "패들을 1.5배 확대 (10초)"),
                 ('SLOW_BALL', "공의 속도를 0.7배 감소 (10초)"),
@@ -347,48 +332,45 @@ def main():
             
             for powerup_type, description in powerup_info:
                 color = POWERUP_COLORS[powerup_type]
-                # 색상 박스 그리기
                 pygame.draw.rect(screen, color, (40, current_y, 20, 20))
                 pygame.draw.rect(screen, BLACK, (40, current_y, 20, 20), 2)
                 
-                # 설명 텍스트 (한글) - 같은 라인에 정렬
                 desc_text = korean_font.render(description, True, DARK_GRAY)
-                screen.blit(desc_text, (70, current_y - 2))  # -2로 미세 조정하여 정렬
+                screen.blit(desc_text, (70, current_y - 2))
                 current_y += line_height
             
-            # 돌아가기 안내
             hint_text = korean_font.render("ESC 또는 SPACE로 메뉴로 돌아가기", True, ORANGE)
             screen.blit(hint_text, hint_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT - 30)))
 
         elif game_state == 'START':
-            # START 상태에서 파워업 없음
             powerups.clear()
             
+            # START 화면 제목
             title_text = title_font.render("BRICK BREAKER", True, BLUE)
+            # [핵심] MAIN_MENU와 똑같은 위치 (SCREEN_HEIGHT/2 - 150)로 설정하여 움직이지 않는 것처럼 보이게 함
+            screen.blit(title_text, title_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 150)))
+            
+            # 나머지 텍스트들을 제목 아래에 배치 (위치 조정함)
             start_text = sub_font.render("Press SPACE to Start", True, BLACK)
             lives_text = score_font.render(f"Lives: {INITIAL_LIVES}", True, RED)
             highscore_text = score_font.render(f"High Score: {highscore}", True, ORANGE)
-            screen.blit(title_text, title_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 50)))
-            screen.blit(start_text, start_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 20)))
-            screen.blit(lives_text, lives_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 80)))
-            screen.blit(highscore_text, highscore_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 120)))
+            
+            screen.blit(start_text, start_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 50)))
+            screen.blit(lives_text, lives_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 10)))
+            screen.blit(highscore_text, highscore_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 50)))
 
         elif game_state == 'READY':
-            # 공이 패들 위에 고정된 상태에서 대기
             paddle.move()
-            
-            # 공을 항상 패들 위의 중앙에 유지
             ball.rect.centerx = paddle.rect.centerx
             ball.rect.bottom = paddle.rect.top
             
             ready_text = sub_font.render("READY! Press SPACE", True, BLUE)
             screen.blit(ready_text, ready_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 100)))
             
-            # 화면 그리기
             paddle.draw(screen)
             ball.draw(screen)
             for brick in bricks: brick.draw(screen)
-            for powerup in powerups: powerup.draw(screen)  # READY 상태에서도 파워업 표시
+            for powerup in powerups: powerup.draw(screen)
             score_text = score_font.render(f"Score: {score}  Level: {level}  Lives: {lives}", True, DARK_GRAY)
             screen.blit(score_text, (10, 10))
 
@@ -400,33 +382,28 @@ def main():
                 if lives <= 0:
                     game_state = 'GAME_OVER'
                 else:
-                    # 공을 패들 위에 고정
                     ball.rect.centerx = paddle.rect.centerx
                     ball.rect.bottom = paddle.rect.top
                     ball.prev_rect = ball.rect.copy()
                     game_state = 'READY' 
             
-            # --- 패들 충돌 처리 ---
+            # 패들 충돌
             if ball.rect.colliderect(paddle.rect):
-                # 이전 프레임 위치를 확인하여 터널링 방지
                 if not ball.prev_rect.colliderect(paddle.rect):
-                    # 공이 위에서 내려올 때 (y축 중심 비교)
                     if ball.rect.centery < paddle.rect.centery:
-                        ball.dy = -abs(ball.dy) # 무조건 위로 반사
+                        ball.dy = -abs(ball.dy)
                         ball.rect.bottom = paddle.rect.top 
                     else:
-                        # 옆면 충돌
                         ball.dx *= -1
                         if ball.rect.centerx < paddle.rect.centerx:
                              ball.rect.right = paddle.rect.left
                         else:
                              ball.rect.left = paddle.rect.right
 
-            # --- 벽돌 충돌 처리 ---
+            # 벽돌 충돌
             collided_bricks = []
             for brick in bricks:
                 if brick.active and ball.rect.colliderect(brick.rect):
-                    # 이미 처리된 벽돌이거나, 이전 프레임부터 겹쳐있던 경우 무시
                     if brick in collided_bricks:
                         continue
                     if ball.prev_rect.colliderect(brick.rect):
@@ -434,14 +411,12 @@ def main():
                     
                     brick.active = False
                     collided_bricks.append(brick)
-                    score += (10 + (level * 2)) * score_multiplier  # 점수 배수 적용
+                    score += (10 + (level * 2)) * score_multiplier
                     
-                    # 20% 확률로 파워업 드롭
                     if random.random() < 0.2:
                         powerup_type = random.choice(POWERUP_TYPES)
                         powerups.append(PowerUp(brick.rect.centerx, brick.rect.centery, powerup_type))
                     
-                    # 겹침 깊이(penetration depth) 계산으로 정확한 충돌 면 판정
                     overlap_top = ball.rect.bottom - brick.rect.top
                     overlap_bottom = brick.rect.bottom - ball.rect.top
                     overlap_left = ball.rect.right - brick.rect.left
@@ -462,27 +437,23 @@ def main():
                         ball.dx *= -1
                         ball.rect.left = brick.rect.right
 
-            # 스테이지 클리어 체크
             if all(not brick.active for brick in bricks):
                 screen.fill(WHITE)
                 clear_text = title_font.render(f"STAGE {level} CLEAR!", True, BLUE)
                 screen.blit(clear_text, clear_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2)))
                 pygame.display.flip()
-                
                 pygame.time.delay(2000)
-                
                 level += 1
                 ball.reset(level)
-                bricks = create_bricks()
+                bricks = create_bricks() 
             
-            # --- 파워업 처리 ---
+            # 파워업
             for powerup in powerups[:]:
                 powerup.move()
                 if not powerup.active:
                     powerups.remove(powerup)
                     continue
                 
-                # 패들과 충돌
                 if powerup.rect.colliderect(paddle.rect):
                     if powerup.powerup_type == 'WIDE_PADDLE':
                         paddle.rect.width = int(PADDLE_WIDTH * 1.5)
@@ -490,9 +461,8 @@ def main():
                     elif powerup.powerup_type == 'SLOW_BALL':
                         ball.dx *= 0.7
                         ball.dy *= 0.7
-                        slow_ball_timer = POWERUP_DURATION  # 10초 지속
+                        slow_ball_timer = POWERUP_DURATION
                     elif powerup.powerup_type == 'DOUBLE_SCORE':
-                        # 10초 동안 벽돌 점수 2배
                         score_multiplier = 2
                         score_multiplier_timer = POWERUP_DURATION
                     elif powerup.powerup_type == 'EXTRA_LIFE':
@@ -500,8 +470,6 @@ def main():
                     
                     powerup.active = False
                     powerups.remove(powerup)
-            
-            # 파워업 타이머 감소
             
             if paddle_width_timer > 0:
                 paddle_width_timer -= 1
@@ -511,37 +479,32 @@ def main():
             if slow_ball_timer > 0:
                 slow_ball_timer -= 1
                 if slow_ball_timer == 0:
-                    # 느린 공 효과 해제 (원래 속도로 복구)
                     ball.dx /= 0.7
                     ball.dy /= 0.7
             
             if score_multiplier_timer > 0:
                 score_multiplier_timer -= 1
                 if score_multiplier_timer == 0:
-                    score_multiplier = 1  # 점수 배수 해제
+                    score_multiplier = 1
 
-            # 화면 그리기
             paddle.draw(screen)
             ball.draw(screen)
             for brick in bricks: brick.draw(screen)
-            for powerup in powerups: powerup.draw(screen)  # 파워업 그리기
+            for powerup in powerups: powerup.draw(screen)
             
-            # 점수 배수 활성화 상태 표시
             multiplier_text = ""
             if score_multiplier == 2:
                 multiplier_text = " [x2 SCORE]"
-                multiplier_seconds = (score_multiplier_timer + 29) // 30  # 30fps 기준
+                multiplier_seconds = (score_multiplier_timer + 29) // 30
             
             score_text = score_font.render(f"Score: {score}  Level: {level}  Lives: {lives}{multiplier_text}", True, DARK_GRAY)
             screen.blit(score_text, (10, 10))
             
-            # 점수 배수 남은 시간 표시
             if score_multiplier == 2:
-                timer_text = score_font.render(f"x2 Score: {multiplier_seconds}s", True, (255, 165, 0))  # 오렌지색
+                timer_text = score_font.render(f"x2 Score: {multiplier_seconds}s", True, ORANGE)
                 screen.blit(timer_text, (10, 50))
 
         elif game_state == 'PAUSE':
-            # 게임 일시정지 화면
             pause_overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
             pause_overlay.set_alpha(128)
             pause_overlay.fill(BLACK)
@@ -553,7 +516,6 @@ def main():
             screen.blit(resume_text, resume_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 40)))
 
         elif game_state == 'GAME_OVER':
-            # 현재 스코어가 하이스코어보다 크면 업데이트
             if score > highscore:
                 highscore = score
                 save_highscore(highscore)
