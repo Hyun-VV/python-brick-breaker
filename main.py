@@ -4,7 +4,7 @@ import random
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.0.0' # 정식 배포 버전
+__version__ = '1.1.0'  # 생명력 시스템 추가
 __author__ = 'Python Developer'
 
 # --- 설정 상수 ---
@@ -26,6 +26,10 @@ RED = (255, 0, 0)
 BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
 DARK_GRAY = (50, 50, 50)
+YELLOW = (255, 255, 0)
+
+# 게임 설정
+INITIAL_LIVES = 3
 
 # --- 헬퍼 함수 ---
 
@@ -131,7 +135,8 @@ def main():
     
     score = 0
     level = 1
-    game_state = 'START'
+    lives = INITIAL_LIVES
+    game_state = 'START'  # START, READY, PLAYING, GAME_OVER
 
     running = True
     while running:
@@ -143,6 +148,10 @@ def main():
             if event.type == pygame.KEYDOWN:
                 if game_state == 'START':
                     if event.key == pygame.K_SPACE:
+                        game_state = 'READY'
+                
+                elif game_state == 'READY':
+                    if event.key == pygame.K_SPACE:
                         game_state = 'PLAYING'
                 
                 elif game_state == 'PLAYING':
@@ -153,9 +162,10 @@ def main():
                     if event.key == pygame.K_SPACE:
                         score = 0
                         level = 1
+                        lives = INITIAL_LIVES
                         ball.reset(level)
                         bricks = create_bricks()
-                        game_state = 'PLAYING'
+                        game_state = 'START'
 
         screen.fill(WHITE)
 
@@ -163,14 +173,42 @@ def main():
         if game_state == 'START':
             title_text = title_font.render("BRICK BREAKER", True, BLUE)
             start_text = sub_font.render("Press SPACE to Start", True, BLACK)
+            lives_text = score_font.render(f"Lives: {INITIAL_LIVES}", True, RED)
             screen.blit(title_text, title_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 50)))
             screen.blit(start_text, start_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 20)))
+            screen.blit(lives_text, lives_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 80)))
+
+        elif game_state == 'READY':
+            # 공이 패들 위에 고정된 상태에서 대기
+            paddle.move()
+            
+            # 공을 항상 패들 위의 중앙에 유지
+            ball.rect.centerx = paddle.rect.centerx
+            ball.rect.bottom = paddle.rect.top
+            
+            ready_text = sub_font.render("READY! Press SPACE", True, BLUE)
+            screen.blit(ready_text, ready_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 100)))
+            
+            # 화면 그리기
+            paddle.draw(screen)
+            ball.draw(screen)
+            for brick in bricks: brick.draw(screen)
+            score_text = score_font.render(f"Score: {score}  Level: {level}  Lives: {lives}", True, DARK_GRAY)
+            screen.blit(score_text, (10, 10))
 
         elif game_state == 'PLAYING':
             paddle.move()
             
             if not ball.move():
-                game_state = 'GAME_OVER' 
+                lives -= 1
+                if lives <= 0:
+                    game_state = 'GAME_OVER'
+                else:
+                    # 공을 패들 위에 고정
+                    ball.rect.centerx = paddle.rect.centerx
+                    ball.rect.bottom = paddle.rect.top
+                    ball.prev_rect = ball.rect.copy()
+                    game_state = 'READY' 
             
             # --- 패들 충돌 처리 ---
             if ball.rect.colliderect(paddle.rect):
@@ -240,16 +278,18 @@ def main():
             paddle.draw(screen)
             ball.draw(screen)
             for brick in bricks: brick.draw(screen)
-            score_text = score_font.render(f"Score: {score}  Level: {level}", True, DARK_GRAY)
+            score_text = score_font.render(f"Score: {score}  Level: {level}  Lives: {lives}", True, DARK_GRAY)
             screen.blit(score_text, (10, 10))
 
         elif game_state == 'GAME_OVER':
             over_text = title_font.render("GAME OVER", True, RED)
             score_msg = sub_font.render(f"Final Score: {score}", True, BLACK)
-            retry_text = sub_font.render("Press SPACE to Retry", True, DARK_GRAY)
-            screen.blit(over_text, over_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 60)))
+            lives_msg = score_font.render(f"Lives Remaining: {lives}", True, RED)
+            retry_text = sub_font.render("Press SPACE to Start", True, DARK_GRAY)
+            screen.blit(over_text, over_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 70)))
             screen.blit(score_msg, score_msg.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2)))
-            screen.blit(retry_text, retry_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 50)))
+            screen.blit(lives_msg, lives_msg.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 40)))
+            screen.blit(retry_text, retry_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 90)))
 
         pygame.display.flip()
         clock.tick(FPS)
