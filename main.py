@@ -6,7 +6,7 @@ import os
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.4.3'  # 버그 수정 (상단바 충돌, UI 정렬, 타이머 숨김)
+__version__ = '1.4.4'  # UI 디자인 변경 (이미지 반영) & 레벨 클리어 후 대기 로직 추가
 __author__ = 'Python Developer'
 
 # --- 설정 상수 ---
@@ -20,7 +20,7 @@ BRICK_HEIGHT = 20
 BRICK_ROWS = 5
 BRICK_COLS = 10
 FPS = 60
-HEADER_HEIGHT = 60  # [수정] 상단 상태바 높이 상수화
+HEADER_HEIGHT = 60  # 상단 상태바 높이
 
 # 색상 (R, G, B)
 WHITE = (255, 255, 255)
@@ -28,10 +28,10 @@ BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
-DARK_GRAY = (50, 50, 50)
+DARK_GRAY = (50, 50, 50) # 기본 배경 회색
 ORANGE = (255, 165, 0)
 YELLOW = (255, 255, 0)
-HEADER_BG = (30, 30, 30) 
+HEADER_BG = (50, 50, 50) # [디자인 수정] 상단 상태바 배경색 (진한 회색)
 
 # 게임 설정
 INITIAL_LIVES = 3
@@ -55,7 +55,7 @@ def create_bricks():
     total_bricks_width = BRICK_COLS * (BRICK_WIDTH + 5) - 5
     start_x = (SCREEN_WIDTH - total_bricks_width) // 2
     
-    # 상단 UI(헤더) 공간 확보를 위해 벽돌 시작 위치 조정
+    # 상단 UI(헤더) 공간 확보
     start_y = 80 
 
     for row in range(BRICK_ROWS):
@@ -134,7 +134,7 @@ class Ball:
             self.dx *= -1
             self.rect.right = SCREEN_WIDTH
         
-        # [수정 2] 천장 충돌 로직 변경: 0이 아니라 HEADER_HEIGHT(60)에서 튕기도록 수정
+        # 상단바 충돌 (HEADER_HEIGHT)
         if self.rect.top <= HEADER_HEIGHT:
             self.dy *= -1
             self.rect.top = HEADER_HEIGHT
@@ -182,9 +182,10 @@ def main():
     pygame.display.set_caption(f"{__title__} v{__version__}")
     clock = pygame.time.Clock()
 
-    # 폰트 설정
-    ui_font_bold = pygame.font.SysFont(None, 45)  
-    ui_font_small = pygame.font.SysFont(None, 30) 
+    # 폰트 설정 (깔끔한 고딕/Arial 계열 사용)
+    # 윈도우 기본 폰트인 arial 등을 사용하여 하트 특수문자(♥)를 지원하도록 함
+    ui_font_large = pygame.font.SysFont('arial', 40, bold=True)  
+    ui_font_medium = pygame.font.SysFont('arial', 30, bold=True)
     
     score_font = pygame.font.SysFont(None, 36)
     title_font = pygame.font.SysFont(None, 80)
@@ -211,6 +212,30 @@ def main():
     paddle_width_timer = 0
     slow_ball_timer = 0
     score_multiplier_timer = 0
+
+    # UI 그리기 헬퍼 함수 (중복 제거)
+    def draw_game_ui():
+        # 1. 헤더 배경 (진한 회색)
+        pygame.draw.rect(screen, HEADER_BG, (0, 0, SCREEN_WIDTH, HEADER_HEIGHT))
+        
+        # 2. LEVEL (왼쪽, 흰색)
+        level_surface = ui_font_medium.render(f"LEVEL: {level}", True, WHITE)
+        level_rect = level_surface.get_rect(midleft=(20, HEADER_HEIGHT // 2))
+        screen.blit(level_surface, level_rect)
+
+        # 3. SCORE (중앙, 흰색, 큼)
+        score_str = f"SCORE: {score}"
+        if score_multiplier == 2:
+            score_str += " (x2)"
+        score_surface = ui_font_large.render(score_str, True, WHITE)
+        score_rect = score_surface.get_rect(center=(SCREEN_WIDTH // 2, HEADER_HEIGHT // 2))
+        screen.blit(score_surface, score_rect)
+
+        # 4. LIVES (오른쪽, 빨간색 하트 + 텍스트)
+        # 하트 특수문자 사용
+        lives_surface = ui_font_medium.render(f"♥ x {lives}", True, RED) 
+        lives_rect = lives_surface.get_rect(midright=(SCREEN_WIDTH - 20, HEADER_HEIGHT // 2))
+        screen.blit(lives_surface, lives_rect)
 
     running = True
     while running:
@@ -314,9 +339,6 @@ def main():
                             elif SCREEN_HEIGHT/2 + 100 < mouse_y < SCREEN_HEIGHT/2 + 170:
                                 running = False
                     
-                    elif game_state == 'INSTRUCTIONS':
-                        pass
-                    
                     elif game_state == 'PAUSE':
                         if SCREEN_WIDTH/2 - 150 < mouse_x < SCREEN_WIDTH/2 + 150:
                             if SCREEN_HEIGHT/2 - 40 < mouse_y < SCREEN_HEIGHT/2 + 10:
@@ -419,7 +441,6 @@ def main():
             ball.rect.centerx = paddle.rect.centerx
             ball.rect.bottom = paddle.rect.top
             
-            # [수정 1] 텍스트를 화면 정중앙(HEIGHT/2)으로 배치
             ready_text = sub_font.render("READY! Press SPACE", True, BLUE)
             screen.blit(ready_text, ready_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2)))
             
@@ -428,21 +449,8 @@ def main():
             for brick in bricks: brick.draw(screen)
             for powerup in powerups: powerup.draw(screen)
             
-            # 상단바 UI 그리기 (READY 상태)
-            pygame.draw.rect(screen, HEADER_BG, (0, 0, SCREEN_WIDTH, HEADER_HEIGHT))
-            
-            level_str = f"LEVEL {level}"
-            level_text = ui_font_small.render(level_str, True, WHITE)
-            screen.blit(level_text, (20, 18))
-
-            score_str = f"SCORE: {score}"
-            score_text = ui_font_bold.render(score_str, True, YELLOW)
-            screen.blit(score_text, score_text.get_rect(center=(SCREEN_WIDTH/2, 30)))
-
-            lives_str = f"LIVES: {lives}"
-            lives_text = ui_font_small.render(lives_str, True, RED)
-            lives_rect = lives_text.get_rect(right=SCREEN_WIDTH - 20, top=18)
-            screen.blit(lives_text, lives_rect)
+            # UI 그리기 (함수 호출)
+            draw_game_ui()
 
         elif game_state == 'PLAYING':
             paddle.move()
@@ -507,15 +515,26 @@ def main():
                         ball.dx *= -1
                         ball.rect.left = brick.rect.right
 
+            # [수정 2] 스테이지 클리어 로직 변경
             if all(not brick.active for brick in bricks):
                 screen.fill(WHITE)
+                # 클리어 메시지를 잠시 보여주고
                 clear_text = title_font.render(f"STAGE {level} CLEAR!", True, BLUE)
                 screen.blit(clear_text, clear_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2)))
                 pygame.display.flip()
                 pygame.time.delay(2000)
+                
+                # 레벨업 및 초기화
                 level += 1
                 ball.reset(level)
-                bricks = create_bricks() 
+                bricks = create_bricks()
+                
+                # 공을 패들 위에 고정
+                ball.rect.centerx = paddle.rect.centerx
+                ball.rect.bottom = paddle.rect.top
+                
+                # 상태를 READY로 변경하여 스페이스바 대기
+                game_state = 'READY'
             
             # 파워업
             for powerup in powerups[:]:
@@ -562,30 +581,8 @@ def main():
             for brick in bricks: brick.draw(screen)
             for powerup in powerups: powerup.draw(screen)
             
-            # 상단바 UI 그리기 (PLAYING 상태)
-            pygame.draw.rect(screen, HEADER_BG, (0, 0, SCREEN_WIDTH, HEADER_HEIGHT))
-            
-            # LEVEL (좌측)
-            level_str = f"LEVEL {level}"
-            level_text = ui_font_small.render(level_str, True, WHITE)
-            screen.blit(level_text, (20, 18))
-
-            # SCORE (중앙) - 배수 적용 시 텍스트 변경
-            score_str = f"SCORE: {score}"
-            if score_multiplier == 2:
-                score_str += " (x2)"
-            
-            score_color = YELLOW if score_multiplier == 1 else ORANGE
-            score_text = ui_font_bold.render(score_str, True, score_color)
-            screen.blit(score_text, score_text.get_rect(center=(SCREEN_WIDTH/2, 30)))
-
-            # LIVES (우측)
-            lives_str = f"LIVES: {lives}"
-            lives_text = ui_font_small.render(lives_str, True, RED)
-            lives_rect = lives_text.get_rect(right=SCREEN_WIDTH - 20, top=18)
-            screen.blit(lives_text, lives_rect)
-            
-            # [수정 3] 파워업 타이머 표시 제거됨
+            # UI 그리기 (함수 호출)
+            draw_game_ui()
 
         elif game_state == 'PAUSE':
             pause_overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
