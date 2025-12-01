@@ -6,7 +6,7 @@ import os
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.3.4'  #시작화면과 설명화면 수정
+__version__ = '1.3.5'  #시작화면과 설명화면 폰트 수정
 __author__ = 'Python Developer'
 
 # --- 설정 상수 ---
@@ -180,10 +180,12 @@ def main():
     pygame.display.set_caption(f"{__title__} v{__version__}")
     clock = pygame.time.Clock()
 
-    # 폰트 설정 (한글 지원)
-    score_font = pygame.font.SysFont('gulim', 36)
-    title_font = pygame.font.SysFont('gulim', 80)
-    sub_font = pygame.font.SysFont('gulim', 40)
+    # 폰트 설정 (기본 폰트 + 한글 폰트)
+    score_font = pygame.font.SysFont(None, 36)
+    title_font = pygame.font.SysFont(None, 80)
+    sub_font = pygame.font.SysFont(None, 40)
+    korean_title_font = pygame.font.SysFont('malgungothic', 40)  # 한글 제목 폰트
+    korean_font = pygame.font.SysFont('malgungothic', 28)  # 한글 설명 폰트 (작은 크기)
 
     # 객체 생성
     paddle = Paddle()
@@ -324,7 +326,7 @@ def main():
             ]
             
             for control in controls:
-                control_text = score_font.render(control, True, DARK_GRAY)
+                control_text = korean_font.render(control, True, DARK_GRAY)
                 screen.blit(control_text, (40, current_y))
                 current_y += line_height
             
@@ -349,13 +351,13 @@ def main():
                 pygame.draw.rect(screen, color, (40, current_y, 20, 20))
                 pygame.draw.rect(screen, BLACK, (40, current_y, 20, 20), 2)
                 
-                # 설명 텍스트
-                desc_text = score_font.render(description, True, DARK_GRAY)
-                screen.blit(desc_text, (70, current_y))
+                # 설명 텍스트 (한글) - 같은 라인에 정렬
+                desc_text = korean_font.render(description, True, DARK_GRAY)
+                screen.blit(desc_text, (70, current_y - 2))  # -2로 미세 조정하여 정렬
                 current_y += line_height
             
             # 돌아가기 안내
-            hint_text = score_font.render("ESC 또는 SPACE로 메뉴로 돌아가기", True, ORANGE)
+            hint_text = korean_font.render("ESC 또는 SPACE로 메뉴로 돌아가기", True, ORANGE)
             screen.blit(hint_text, hint_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT - 30)))
 
         elif game_state == 'START':
