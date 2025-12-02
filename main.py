@@ -6,7 +6,7 @@ import os
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.4.5'  # 버그 수정: 클리어 대기 시간 동안 입력 무시 로직 강화
+__version__ = '1.4.6'  # 디자인 개선 및 입력 버퍼 버그 수정 완료
 __author__ = 'Python Developer'
 
 # --- 설정 상수 ---
@@ -375,33 +375,52 @@ def main():
                 screen.blit(menu_text, text_rect)
 
         elif game_state == 'INSTRUCTIONS':
-            title_text = title_font.render("GAME INSTRUCTIONS", True, BLUE)
-            screen.blit(title_text, title_text.get_rect(center=(SCREEN_WIDTH/2, 30)))
+            # [디자인 변경] 1. 배경색을 완전히 흰색이 아닌 부드러운 톤으로 변경
+            screen.fill((245, 245, 250))
+
+            # [디자인 변경] 2. 상단 타이틀 영역에 헤더와 같은 배경색 띠 적용
+            pygame.draw.rect(screen, HEADER_BG, (0, 0, SCREEN_WIDTH, 110))
+
+            # [디자인 변경] 3. 타이틀에 그림자 효과를 주어 입체감 부여 및 색상 변경 (흰색)
+            title_shadow = title_font.render("GAME INSTRUCTIONS", True, BLACK)
+            title_text = title_font.render("GAME INSTRUCTIONS", True, WHITE)
+            # 그림자를 먼저 약간 빗겨서 있고, 그 위에 메인 텍스트를 그림
+            screen.blit(title_shadow, title_shadow.get_rect(center=(SCREEN_WIDTH/2 + 3, 58)))
+            screen.blit(title_text, title_text.get_rect(center=(SCREEN_WIDTH/2, 55)))
             
-            start_y = 80
-            line_height = 35
+            start_y = 138 # 본문 시작 위치를 아래로 조정
+            line_height = 40 # 줄 간격을 넓게 조정하여 시원한 느낌 부여
             current_y = start_y
             
-            control_title = score_font.render("KEYBOARD CONTROLS", True, BLUE)
-            screen.blit(control_title, (20, current_y))
-            current_y += line_height + 5
+            # 설명 화면 전용 폰트
+            instruction_font = pygame.font.SysFont('malgungothic', 25)
+
+            # [디자인 변경] 4. 소제목 스타일: 주황색 강조 및 하단 밑줄 포인트 추가
+            control_title = ui_font_medium.render("KEYBOARD CONTROLS", True, ORANGE)
+            screen.blit(control_title, (60, current_y))
+            # 소제목 아래에 주황색 선 긋기
+            pygame.draw.line(screen, ORANGE, (60, current_y + 35), (60 + control_title.get_width(), current_y + 35), 3)
+            current_y += line_height + 10 # 소제목과 본문 사이 간격
             
             controls = [
-                "← LEFT ARROW: 패들 왼쪽 이동",
-                "→ RIGHT ARROW: 패들 오른쪽 이동",
-                "ESC: 게임 일시정지"
+                "← :  패들 왼쪽 이동",
+                "→ :  패들 오른쪽 이동",
+                "ESC :  게임 일시정지"
             ]
             
             for control in controls:
-                control_text = korean_font.render(control, True, DARK_GRAY)
-                screen.blit(control_text, (40, current_y))
+                # 폰트 색상을 진한 회색으로 변경하여 안정감 부여
+                control_text = instruction_font.render(control, True, DARK_GRAY)
+                screen.blit(control_text, (90, current_y)) # 왼쪽 여백 확보
                 current_y += line_height
             
-            current_y += 10
+            current_y += 25 # 섹션 사이 간격 추가
             
-            powerup_title = score_font.render("POWER-UPS", True, BLUE)
-            screen.blit(powerup_title, (20, current_y))
-            current_y += line_height + 5
+            # [디자인 변경] 소제목 스타일 동일하게 적용
+            powerup_title = ui_font_medium.render("POWER-UPS", True, ORANGE)
+            screen.blit(powerup_title, (60, current_y))
+            pygame.draw.line(screen, ORANGE, (60, current_y + 35), (60 + powerup_title.get_width(), current_y + 35), 3)
+            current_y += line_height + 10
             
             powerup_info = [
                 ('WIDE_PADDLE', "패들을 1.5배 확대 (10초)"),
@@ -412,12 +431,16 @@ def main():
             
             for powerup_type, description in powerup_info:
                 color = POWERUP_COLORS[powerup_type]
-                pygame.draw.rect(screen, color, (40, current_y, 20, 20))
-                pygame.draw.rect(screen, BLACK, (40, current_y, 20, 20), 2)
+                # [디자인 변경] 5. 아이콘 크기를 키우고 테두리를 명확하게
+                icon_size = 35
+                icon_rect = pygame.Rect(90, current_y + 2, icon_size, icon_size)
+                pygame.draw.rect(screen, color, icon_rect)
+                pygame.draw.rect(screen, DARK_GRAY, icon_rect, 3) # 테두리 두께 증가
                 
-                desc_text = korean_font.render(description, True, DARK_GRAY)
-                screen.blit(desc_text, (70, current_y - 2))
-                current_y += line_height
+                desc_text = instruction_font.render(description, True, DARK_GRAY)
+                # 아이콘과 텍스트 사이 간격을 넓힘
+                screen.blit(desc_text, (90 + icon_size + 20, current_y)) 
+                current_y += line_height + 5 # 항목 사이 간격 약간 추가
 
         elif game_state == 'START':
             powerups.clear()
