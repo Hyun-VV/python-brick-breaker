@@ -21,7 +21,7 @@ SLOW_FACTOR = 0.7
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.6.1' # 패들 물리 엔진 수정 (절대 각도 -> 벡터 굴절)
+__version__ = '1.6.2' # 설명 화면 UI 정렬 및 순서 변경
 __author__ = 'Python Developer'
 
 # --- 클래스 정의 ---
@@ -172,7 +172,7 @@ def main():
 
                 elif state == 'PLAYING':
                     if e.key == pygame.K_ESCAPE: state = 'PAUSE'
-                    elif e.key == pygame.K_c:
+                    elif e.key == pygame.K_c: 
                          for b in bricks: b.active = False
 
                 elif state == 'PAUSE':
@@ -215,15 +215,47 @@ def main():
             screen.fill((245, 245, 250)); pygame.draw.rect(screen, HEADER_BG, (0,0,SCREEN_W, 110))
             draw_text("GAME INSTRUCTIONS", 'T', WHITE, (SCREEN_W//2, 55), True)
             y = 150
+            
             draw_text("CONTROLS", 'M', ORANGE, (SCREEN_W//2, y))
-            for t in ["Arrow Keys: Move", "SPACE: Launch", "ESC: Pause", "C: Cheat Clear"]:
-                draw_text(t, 'K', DARK_GRAY, (SCREEN_W//2, y + 40)); y += 30
-            y += 60
+            y += 40
+            
+            # --- [수정] 컨트롤 UI 정렬 및 순서 변경 ---
+            # 순서: SPACE -> ESC -> Arrow
+            controls = [
+                ("SPACE", "Launch"),
+                ("ESC", "Pause"),
+                ("← / →", "Move")
+            ]
+            
+            for key_txt, desc in controls:
+                key_w = 120 if key_txt == "SPACE" else 80
+                
+                # [수정] 왼쪽 정렬 (파워업 아이콘과 동일한 X좌표 사용)
+                k_rect = pygame.Rect(0, 0, key_w, 40)
+                k_rect.topleft = (SCREEN_W // 2 - 150, y) # 파워업 아이콘 위치와 동일하게
+                
+                pygame.draw.rect(screen, SHADOW_GRAY, k_rect.move(0, 4), border_radius=8)
+                pygame.draw.rect(screen, WHITE, k_rect, border_radius=8)
+                pygame.draw.rect(screen, DARK_GRAY, k_rect, 2, border_radius=8)
+                draw_text(key_txt, 'KEY', DARK_GRAY, k_rect.center)
+                
+                # 설명 텍스트 (파워업 텍스트와 정렬 맞춤)
+                text_x = SCREEN_W // 2 + 20 
+                text_y = k_rect.centery
+                # 텍스트를 왼쪽 정렬로 그리기 위해 별도 렌더링
+                desc_surf = fonts['K'].render(desc, True, DARK_GRAY)
+                screen.blit(desc_surf, desc_surf.get_rect(midleft=(text_x, text_y)))
+                
+                y += 55
+
+            y += 20
             draw_text("POWER-UPS", 'M', ORANGE, (SCREEN_W//2, y))
             for i, (k, d) in enumerate([('WIDE',"Paddle x2.0"), ('SLOW',"Speed x0.7 (Stacks)"), ('DBL',"Score x2"), ('LIFE',"+1 Life")]):
                 py = y + 40 + i*40
+                # 파워업 아이콘
                 pygame.draw.rect(screen, P_COLORS[k], (SCREEN_W//2 - 150, py, 30, 30))
-                draw_text(d, 'K', DARK_GRAY, (SCREEN_W//2 + 20, py + 15))
+                # 파워업 설명 (위 컨트롤 설명과 라인 맞춤)
+                draw_text(d, 'K', DARK_GRAY, (SCREEN_W//2 + 20, py + 15)) # draw_text는 center 기준이지만 위치값으로 정렬
 
         elif state == 'START':
             draw_text("BRICK BREAKER", 'T', BLUE, (SCREEN_W//2, 200))
@@ -254,7 +286,6 @@ def main():
             elif state == 'PLAYING':
                 paddle.move()
                 
-                # --- 물리 엔진 (축 분리 + Snapping) ---
                 ball.x += ball.dx
                 ball.rect.centerx = int(ball.x)
                 if ball.rect.left <= 0:
@@ -284,29 +315,18 @@ def main():
                     ball.dy = abs(ball.dy)
                 ball.rect.centery = int(ball.y)
 
-                # [수정됨] 패들 충돌: 벡터 굴절(Nudge) 방식
-                # 기존 방향을 유지하면서, 맞은 위치에 따라 약간의 회전력을 더함
                 if ball.rect.colliderect(paddle.rect):
-                    if ball.dy > 0: # 내려오다가 맞음
+                    if ball.dy > 0: 
                         ball.y = paddle.rect.top - BALL_R
                         ball.rect.centery = int(ball.y)
                         
-                        # 1. 기본 반사 (위로)
                         ball.dy *= -1
-                        
-                        # 2. 맞은 위치 비율 (-1:왼쪽 끝 ~ 1:오른쪽 끝)
                         hit_pos = (ball.rect.centerx - paddle.rect.centerx) / (paddle.rect.width / 2)
                         hit_pos = max(-1, min(1, hit_pos))
                         
-                        # 3. 현재 속력 저장
                         current_speed = math.hypot(ball.dx, ball.dy)
-                        
-                        # 4. X축 속도에 '힘'을 더함 (기존 방향 유지 + 굴절)
-                        # 값을 더하는 방식이므로 왼쪽에서 와서 왼쪽을 맞춰도(dx > 0, hit < 0) 
-                        # dx가 바로 음수가 되지 않고 줄어들기만 하여 자연스럽게 튕김
                         ball.dx += hit_pos * 3.0 
                         
-                        # 5. 속력 정규화 (빨라짐 방지)
                         new_speed = math.hypot(ball.dx, ball.dy)
                         ball.dx = (ball.dx / new_speed) * current_speed
                         ball.dy = (ball.dy / new_speed) * current_speed
