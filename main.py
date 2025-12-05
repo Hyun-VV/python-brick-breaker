@@ -17,10 +17,11 @@ P_COLORS = {'WIDE': (0,200,255), 'SLOW': (200,100,255), 'DBL': (255,200,0), 'LIF
 INITIAL_LIVES, POWERUP_DURATION = 3, 300
 HIGHSCORE_FILE = "highscore.json"
 MAX_LEVEL = 10
+SLOW_FACTOR = 0.7 # 속도 감소 배율 (0.7로 개선)
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.5.0' # 물리 엔진 전면 재작성(터널링/끼임 해결), 속도 밸런스 조정, 올클리어 버그 수정
+__version__ = '1.5.1' # 패널 중앙 확장, 스코어 색상, 밸런스 패치 적용
 __author__ = 'Python Developer'
 
 # --- 클래스 정의 ---
@@ -38,18 +39,15 @@ class Ball:
     def __init__(self): self.reset(1)
     
     def reset(self, level):
-        # 정밀 계산을 위해 float 좌표 사용
         self.x = SCREEN_W / 2
         self.y = SCREEN_H / 2
         self.rect = pygame.Rect(int(self.x), int(self.y), BALL_R*2, BALL_R*2)
         
-        # 속도 설정
         base_speed = 4 + (level * 0.2)
         spd = min(base_speed, 10) 
         self.dx, self.dy = random.choice([-spd, spd]), -spd
         
     def draw(self, screen): 
-        # rect를 그리기 전에 float 좌표를 rect에 동기화 (화면 표시용)
         self.rect.center = (int(self.x), int(self.y))
         pygame.draw.circle(screen, RED, self.rect.center, BALL_R)
 
@@ -110,7 +108,10 @@ def main():
         nonlocal score, level, lives, score_mult, timers
         if full_reset: score, level, lives = 0, 1, INITIAL_LIVES
         
-        paddle.rect.width, paddle.rect.centerx = PADDLE_W, SCREEN_W // 2
+        # 패들 초기화 및 중앙 정렬
+        paddle.rect.width = PADDLE_W
+        paddle.rect.centerx = SCREEN_W // 2
+        
         score_mult, timers = 1, {k: 0 for k in timers}
         powerups.clear()
         ball.reset(level)
@@ -147,7 +148,6 @@ def main():
     while True:
         mouse_pos = pygame.mouse.get_pos()
         
-        # UI 호버 로직
         if state == 'MAIN_MENU':
             for i in range(3):
                 if pygame.Rect(SCREEN_W//2-200, SCREEN_H//2-50+i*75, 400, 60).collidepoint(mouse_pos): menu_sel = i
@@ -222,7 +222,7 @@ def main():
                 draw_text(t, 'K', DARK_GRAY, (SCREEN_W//2, y + 40)); y += 30
             y += 60
             draw_text("POWER-UPS", 'M', ORANGE, (SCREEN_W//2, y))
-            for i, (k, d) in enumerate([('WIDE',"Paddle x1.5"), ('SLOW',"Speed x0.5 (Stacks)"), ('DBL',"Score x2"), ('LIFE',"+1 Life")]):
+            for i, (k, d) in enumerate([('WIDE',"Paddle x2.0"), ('SLOW',"Speed x0.7 (Stacks)"), ('DBL',"Score x2"), ('LIFE',"+1 Life")]):
                 py = y + 40 + i*40
                 pygame.draw.rect(screen, P_COLORS[k], (SCREEN_W//2 - 150, py, 30, 30))
                 draw_text(d, 'K', DARK_GRAY, (SCREEN_W//2 + 20, py + 15))
@@ -234,8 +234,15 @@ def main():
 
         elif state in ['READY', 'PLAYING']:
             pygame.draw.rect(screen, HEADER_BG, (0,0,SCREEN_W, HEADER_H))
+            
+            # 스코어 색상 디테일 적용
+            score_color = WHITE
+            if timers['dbl'] > 0: score_color = P_COLORS['DBL']
+            elif timers['slow'] > 0: score_color = P_COLORS['SLOW']
+            elif timers['wide'] > 0: score_color = P_COLORS['WIDE']
+
             draw_text(f"LEVEL: {level}/{MAX_LEVEL}", 'M', WHITE, (100, HEADER_H//2))
-            draw_text(f"SCORE: {score}" + (" (x2)" if score_mult>1 else ""), 'L', WHITE, (SCREEN_W//2, HEADER_H//2))
+            draw_text(f"SCORE: {score}" + (" (x2)" if score_mult>1 else ""), 'L', score_color, (SCREEN_W//2, HEADER_H//2))
             draw_text(f"♥ {lives}", 'M', RED, (SCREEN_W-60, HEADER_H//2))
             
             paddle.draw(screen); ball.draw(screen)
@@ -250,83 +257,62 @@ def main():
             elif state == 'PLAYING':
                 paddle.move()
                 
-                # --- [완전 재작성] 물리 엔진: 축 분리 이동 (Tunneling 방지) ---
-                
-                # 1. X축 이동
+                # --- 물리 엔진 (축 분리 이동 + Snapping) ---
                 ball.x += ball.dx
                 ball.rect.centerx = int(ball.x)
                 
-                # X축 벽 충돌
+                # X축 충돌
                 if ball.rect.left <= 0:
-                    ball.x = BALL_R # 위치 보정
+                    ball.x = BALL_R 
                     ball.dx = abs(ball.dx)
                 elif ball.rect.right >= SCREEN_W:
-                    ball.x = SCREEN_W - BALL_R # 위치 보정
+                    ball.x = SCREEN_W - BALL_R 
                     ball.dx = -abs(ball.dx)
-                ball.rect.centerx = int(ball.x) # Rect 동기화
+                ball.rect.centerx = int(ball.x) 
 
-                # X축 벽돌 충돌
                 hit_idx = ball.rect.collidelist([b.rect for b in bricks if b.active])
                 if hit_idx != -1:
                     b = [b for b in bricks if b.active][hit_idx]
                     b.active = False
-                    
-                    # 충돌 위치 보정 (Snapping) 및 반사
-                    if ball.dx > 0: # 오른쪽으로 가다 맞음 -> 벽돌 왼쪽 면에 스냅
-                        ball.x = b.rect.left - BALL_R
-                    else: # 왼쪽으로 가다 맞음 -> 벽돌 오른쪽 면에 스냅
-                        ball.x = b.rect.right + BALL_R
-                    
+                    if ball.dx > 0: ball.x = b.rect.left - BALL_R
+                    else: ball.x = b.rect.right + BALL_R
                     ball.dx *= -1
-                    ball.rect.centerx = int(ball.x) # Rect 즉시 동기화
-                    
+                    ball.rect.centerx = int(ball.x)
                     score += (10 + level*2) * score_mult
                     if random.random() < 0.2:
                         powerups.append(PowerUp(b.rect.centerx, b.rect.centery, random.choice(list(P_COLORS.keys()))))
 
-                # 2. Y축 이동
                 ball.y += ball.dy
                 ball.rect.centery = int(ball.y)
 
-                # Y축 벽 충돌 (천장)
+                # Y축 충돌
                 if ball.rect.top <= HEADER_H:
-                    ball.y = HEADER_H + BALL_R # 위치 보정
+                    ball.y = HEADER_H + BALL_R
                     ball.dy = abs(ball.dy)
-                ball.rect.centery = int(ball.y) # Rect 동기화
+                ball.rect.centery = int(ball.y)
 
-                # 패들 충돌
                 if ball.rect.colliderect(paddle.rect):
-                    if ball.dy > 0: # 내려오다가 맞았을 때만
-                        ball.y = paddle.rect.top - BALL_R # 패들 위로 보정
+                    if ball.dy > 0:
+                        ball.y = paddle.rect.top - BALL_R
                         ball.dy *= -1
                         ball.rect.centery = int(ball.y)
 
-                # Y축 벽돌 충돌
                 hit_idx = ball.rect.collidelist([b.rect for b in bricks if b.active])
                 if hit_idx != -1:
                     b = [b for b in bricks if b.active][hit_idx]
                     b.active = False
-                    
-                    # 충돌 위치 보정 (Snapping) 및 반사
-                    if ball.dy > 0: # 내려오다 맞음 -> 벽돌 윗면에 스냅
-                        ball.y = b.rect.top - BALL_R
-                    else: # 올라가다 맞음 -> 벽돌 아랫면에 스냅
-                        ball.y = b.rect.bottom + BALL_R
-                    
+                    if ball.dy > 0: ball.y = b.rect.top - BALL_R
+                    else: ball.y = b.rect.bottom + BALL_R
                     ball.dy *= -1
-                    ball.rect.centery = int(ball.y) # Rect 즉시 동기화
-
+                    ball.rect.centery = int(ball.y)
                     score += (10 + level*2) * score_mult
                     if random.random() < 0.2:
                         powerups.append(PowerUp(b.rect.centerx, b.rect.centery, random.choice(list(P_COLORS.keys()))))
 
-                # 바닥 사망 체크
                 if ball.rect.top > SCREEN_H:
                     lives -= 1
                     powerups.clear()
                     state = 'GAME_OVER' if lives <= 0 else 'READY'
-
-                # --------------------------------------------------------
 
                 if not any(b.active for b in bricks) and state == 'PLAYING':
                     screen.fill(WHITE)
@@ -350,9 +336,14 @@ def main():
                     p.move()
                     if not p.active: powerups.remove(p)
                     elif p.rect.colliderect(paddle.rect):
-                        if p.type == 'WIDE': paddle.rect.width = int(PADDLE_W * 1.5); timers['wide'] = POWERUP_DURATION
+                        if p.type == 'WIDE': 
+                            # 패널 중앙 확장 로직
+                            prev_center = paddle.rect.centerx
+                            paddle.rect.width = int(PADDLE_W * 2.0)
+                            paddle.rect.centerx = prev_center
+                            timers['wide'] = POWERUP_DURATION
                         elif p.type == 'SLOW': 
-                            if timers['slow'] == 0: ball.dx *= 0.5; ball.dy *= 0.5
+                            if timers['slow'] == 0: ball.dx *= SLOW_FACTOR; ball.dy *= SLOW_FACTOR
                             timers['slow'] += POWERUP_DURATION 
                         elif p.type == 'DBL': score_mult = 2; timers['dbl'] = POWERUP_DURATION
                         elif p.type == 'LIFE': lives += 1
@@ -360,10 +351,13 @@ def main():
 
                 if timers['wide'] > 0:
                     timers['wide'] -= 1
-                    if timers['wide'] == 0: paddle.rect.width = PADDLE_W
+                    if timers['wide'] == 0: 
+                        prev_center = paddle.rect.centerx
+                        paddle.rect.width = PADDLE_W
+                        paddle.rect.centerx = prev_center
                 if timers['slow'] > 0:
                     timers['slow'] -= 1
-                    if timers['slow'] == 0: ball.dx /= 0.5; ball.dy /= 0.5
+                    if timers['slow'] == 0: ball.dx /= SLOW_FACTOR; ball.dy /= SLOW_FACTOR
                 if timers['dbl'] > 0:
                     timers['dbl'] -= 1
                     if timers['dbl'] == 0: score_mult = 1
