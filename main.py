@@ -1,4 +1,4 @@
-import pygame, sys, random, json, os
+import pygame, sys, random, json, os, math # [수정] math 모듈 추가
 
 # --- 설정 상수 ---
 SCREEN_W, SCREEN_H = 825, 600
@@ -17,11 +17,11 @@ P_COLORS = {'WIDE': (0,200,255), 'SLOW': (200,100,255), 'DBL': (255,200,0), 'LIF
 INITIAL_LIVES, POWERUP_DURATION = 3, 300
 HIGHSCORE_FILE = "highscore.json"
 MAX_LEVEL = 10
-SLOW_FACTOR = 0.7 # 속도 감소 배율 (0.7로 개선)
+SLOW_FACTOR = 0.7 
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.5.1' # 패널 중앙 확장, 스코어 색상, 밸런스 패치 적용
+__version__ = '1.6.0' # 패들 충돌 시 각도 변화 로직 복구
 __author__ = 'Python Developer'
 
 # --- 클래스 정의 ---
@@ -108,10 +108,8 @@ def main():
         nonlocal score, level, lives, score_mult, timers
         if full_reset: score, level, lives = 0, 1, INITIAL_LIVES
         
-        # 패들 초기화 및 중앙 정렬
         paddle.rect.width = PADDLE_W
         paddle.rect.centerx = SCREEN_W // 2
-        
         score_mult, timers = 1, {k: 0 for k in timers}
         powerups.clear()
         ball.reset(level)
@@ -235,7 +233,6 @@ def main():
         elif state in ['READY', 'PLAYING']:
             pygame.draw.rect(screen, HEADER_BG, (0,0,SCREEN_W, HEADER_H))
             
-            # 스코어 색상 디테일 적용
             score_color = WHITE
             if timers['dbl'] > 0: score_color = P_COLORS['DBL']
             elif timers['slow'] > 0: score_color = P_COLORS['SLOW']
@@ -257,11 +254,9 @@ def main():
             elif state == 'PLAYING':
                 paddle.move()
                 
-                # --- 물리 엔진 (축 분리 이동 + Snapping) ---
+                # --- 물리 엔진 (축 분리 + Snapping) ---
                 ball.x += ball.dx
                 ball.rect.centerx = int(ball.x)
-                
-                # X축 충돌
                 if ball.rect.left <= 0:
                     ball.x = BALL_R 
                     ball.dx = abs(ball.dx)
@@ -284,18 +279,33 @@ def main():
 
                 ball.y += ball.dy
                 ball.rect.centery = int(ball.y)
-
-                # Y축 충돌
                 if ball.rect.top <= HEADER_H:
                     ball.y = HEADER_H + BALL_R
                     ball.dy = abs(ball.dy)
                 ball.rect.centery = int(ball.y)
 
+                # [수정됨] 패들 충돌 로직: 위치에 따른 각도 변화
                 if ball.rect.colliderect(paddle.rect):
-                    if ball.dy > 0:
-                        ball.y = paddle.rect.top - BALL_R
-                        ball.dy *= -1
+                    if ball.dy > 0: # 내려올 때만
+                        ball.y = paddle.rect.top - BALL_R # 위치 보정
                         ball.rect.centery = int(ball.y)
+                        
+                        # 1. 패들 중심으로부터의 거리 비율 계산 (-1.0 ~ 1.0)
+                        center_diff = ball.rect.centerx - paddle.rect.centerx
+                        normalized_diff = center_diff / (paddle.rect.width / 2)
+                        
+                        # 값을 -1 ~ 1 사이로 안전하게 고정
+                        normalized_diff = max(-1, min(1, normalized_diff))
+                        
+                        # 2. 현재 공의 속력(Speed) 계산 (피타고라스)
+                        current_speed = math.hypot(ball.dx, ball.dy)
+                        
+                        # 3. 각도 변경 (X축 속도 조절)
+                        # 최대 85%의 속도를 가로 방향으로 전환 (너무 평평해지지 않게 제한)
+                        ball.dx = normalized_diff * current_speed * 0.85
+                        
+                        # 4. Y축 속도 재계산 (총 속도 유지)
+                        ball.dy = -math.sqrt(abs(current_speed**2 - ball.dx**2))
 
                 hit_idx = ball.rect.collidelist([b.rect for b in bricks if b.active])
                 if hit_idx != -1:
@@ -337,7 +347,6 @@ def main():
                     if not p.active: powerups.remove(p)
                     elif p.rect.colliderect(paddle.rect):
                         if p.type == 'WIDE': 
-                            # 패널 중앙 확장 로직
                             prev_center = paddle.rect.centerx
                             paddle.rect.width = int(PADDLE_W * 2.0)
                             paddle.rect.centerx = prev_center
