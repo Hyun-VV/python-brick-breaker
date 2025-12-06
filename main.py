@@ -21,7 +21,7 @@ SLOW_FACTOR = 0.7
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.7.0' # UI 개선
+__version__ = '1.7.1' # 디버깅 키 삭제
 __author__ = 'Python Developer'
 
 # --- 클래스 ---
@@ -190,8 +190,6 @@ def main():
                 elif state == 'PLAYING':
                     if e.key == pygame.K_ESCAPE: 
                         pre_pause_state = 'PLAYING'; state = 'PAUSE'
-                    elif e.key == pygame.K_c: 
-                        for b in bricks: b.active = False
                 elif state == 'PAUSE':
                     if e.key == pygame.K_UP: pause_sel = (pause_sel - 1) % 3
                     elif e.key == pygame.K_DOWN: pause_sel = (pause_sel + 1) % 3
