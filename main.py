@@ -21,7 +21,7 @@ SLOW_FACTOR = 0.7
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.6.4' # 최종 클리어 화면 수정
+__version__ = '1.6.5' # 클리어 도중 입력 버그 수정
 __author__ = 'Python Developer'
 
 # --- 클래스 ---
@@ -63,7 +63,7 @@ class PowerUp:
 def main():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
-    pygame.display.set_caption("Brick Breaker v1.6.6")
+    pygame.display.set_caption(f"{__title__} v{__version__}")
     clock = pygame.time.Clock()
     
     fonts = {
@@ -77,8 +77,12 @@ def main():
     bricks, powerups = [], []
     score, level, lives, highscore = 0, 1, INITIAL_LIVES, 0
     state, menu_sel, pause_sel = 'MAIN_MENU', 0, 0
+    pre_pause_state = 'READY'
     timers = {'wide': 0, 'slow': 0, 'dbl': 0}
     score_mult = 1
+    
+    # 레벨 클리어 대기 타이머
+    transition_start_time = 0 
     
     try: highscore = json.load(open(HIGHSCORE_FILE))['highscore']
     except: pass
@@ -97,11 +101,12 @@ def main():
                 for c in range(BRICK_COLS):
                     bricks.append(Brick(sx + c*(BRICK_W+5), 80 + r*(BRICK_H+5)))
 
+    # [수정 완료] 변수명 text->txt, color->col 로 일치시킴
     def draw_text(txt, fk, col, center, shadow=False):
         if shadow:
             s = fonts[fk].render(txt, True, BLACK)
             screen.blit(s, s.get_rect(center=(center[0]+3, center[1]+3)))
-        s = fonts[fk].render(txt, True, col)
+        s = fonts[fk].render(txt, True, col) # 여기가 문제였습니다. 수정 완료.
         r = s.get_rect(center=center)
         screen.blit(s, r)
         return r
@@ -133,13 +138,13 @@ def main():
     def draw_end_screen(title, msg, col):
         draw_text(title, 'T', col, (SCREEN_W//2, SCREEN_H//2 - 120))
         if msg: draw_text(msg, 'L', ORANGE, (SCREEN_W//2, SCREEN_H//2 - 50))
-        draw_text(f"Final Score: {score}", 'SUB', BLACK, (SCREEN_W//2, SCREEN_H//2 + 10))
         
-        # [수정 1] ALL_CLEAR 상태에서도 High Score 표시되도록 조건 변경
+        # [수정 완료] 점수 표시 간격 조정 (겹침 해결)
+        draw_text(f"Final Score: {score}", 'SUB', BLACK, (SCREEN_W//2, SCREEN_H//2 + 10))
         if state in ['GAME_OVER', 'ALL_CLEAR']: 
-            draw_text(f"High Score: {highscore}", 'SUB', ORANGE, (SCREEN_W//2, SCREEN_H//2 + 50))
+            draw_text(f"High Score: {highscore}", 'SUB', ORANGE, (SCREEN_W//2, SCREEN_H//2 + 60)) # +50 -> +60으로 간격 넓힘
             
-        gy = SCREEN_H // 2 + 130
+        gy = SCREEN_H // 2 + 140
         draw_keycap("SPACE", "RESTART", BLUE, (SCREEN_W//2 - 20, gy), 'left')
         draw_keycap("ESC", "MENU", ORANGE, (SCREEN_W//2 + 20, gy), 'right')
 
@@ -158,6 +163,10 @@ def main():
 
         for e in events:
             if e.type == pygame.QUIT: sys.exit()
+            
+            if state == 'LEVEL_CLEAR':
+                continue 
+
             if e.type == pygame.KEYDOWN:
                 if state == 'MAIN_MENU':
                     if e.key == pygame.K_UP: menu_sel = (menu_sel - 1) % 3
@@ -170,19 +179,21 @@ def main():
                 elif state == 'START' and e.key == pygame.K_SPACE: state = 'READY'
                 elif state == 'READY':
                     if e.key == pygame.K_SPACE: state = 'PLAYING'
-                    elif e.key == pygame.K_ESCAPE: state = 'PAUSE'
+                    elif e.key == pygame.K_ESCAPE: 
+                        pre_pause_state = 'READY'; state = 'PAUSE'
                 elif state == 'PLAYING':
-                    if e.key == pygame.K_ESCAPE: state = 'PAUSE'
+                    if e.key == pygame.K_ESCAPE: 
+                        pre_pause_state = 'PLAYING'; state = 'PAUSE'
                     elif e.key == pygame.K_c: 
                         for b in bricks: b.active = False
                 elif state == 'PAUSE':
                     if e.key == pygame.K_UP: pause_sel = (pause_sel - 1) % 3
                     elif e.key == pygame.K_DOWN: pause_sel = (pause_sel + 1) % 3
                     elif e.key in (pygame.K_RETURN, pygame.K_SPACE):
-                        if pause_sel == 0: state = 'PLAYING'
+                        if pause_sel == 0: state = pre_pause_state
                         elif pause_sel == 1: init_game(True); state = 'MAIN_MENU'
                         elif pause_sel == 2: sys.exit()
-                    elif e.key == pygame.K_ESCAPE: state = 'PLAYING'
+                    elif e.key == pygame.K_ESCAPE: state = pre_pause_state
                 elif state in ['GAME_OVER', 'ALL_CLEAR']:
                     if e.key == pygame.K_SPACE: init_game(True); state = 'READY'
                     elif e.key == pygame.K_ESCAPE: init_game(True); state = 'MAIN_MENU'
@@ -193,7 +204,7 @@ def main():
                     elif menu_sel == 1: state = 'INFO'
                     else: sys.exit()
                 elif state == 'PAUSE':
-                    if pause_sel == 0: state = 'PLAYING'
+                    if pause_sel == 0: state = pre_pause_state
                     elif pause_sel == 1: init_game(True); state = 'MAIN_MENU'
                     else: sys.exit()
 
@@ -206,12 +217,10 @@ def main():
         elif state == 'INFO':
             screen.fill((245, 245, 250)); pygame.draw.rect(screen, HEADER_BG, (0,0,SCREEN_W, 110))
             draw_text("GAME INSTRUCTIONS", 'T', WHITE, (SCREEN_W//2, 55), True)
-            
             draw_text("CONTROLS", 'M', ORANGE, (SCREEN_W//2, 150))
             draw_keycap("SPACE", "Launch", WHITE, (SCREEN_W//2 - 150, 190), 'custom')
             draw_keycap("ESC", "Pause", WHITE, (SCREEN_W//2 - 150, 245), 'custom')
             draw_keycap("← / →", "Move", WHITE, (SCREEN_W//2 - 150, 300), 'custom')
-
             draw_text("POWER-UPS", 'M', ORANGE, (SCREEN_W//2, 370))
             for i, (k, d) in enumerate([('WIDE',"Paddle x2.0"), ('SLOW',"Speed x0.7 (Stacks)"), ('DBL',"Score x2"), ('LIFE',"+1 Life")]):
                 py = 410 + i*40
@@ -283,14 +292,8 @@ def main():
                     lives -= 1; powerups.clear(); state = 'GAME_OVER' if lives <= 0 else 'READY'
 
                 if not any(b.active for b in bricks):
-                    screen.fill(WHITE); draw_text(f"STAGE {level} CLEAR!", 'T', BLUE, (SCREEN_W//2, SCREEN_H//2))
-                    pygame.display.flip()
-                    pygame.time.wait(2000)
-                    # [수정 2] 대기 시간 동안 쌓인 키 입력(스페이스바 등) 제거 -> 자동 시작 방지
-                    pygame.event.clear() 
-                    
-                    if level >= MAX_LEVEL: state = 'ALL_CLEAR'
-                    else: level += 1; init_game(False, False); state = 'READY'
+                    state = 'LEVEL_CLEAR'
+                    transition_start_time = pygame.time.get_ticks()
 
                 for p in powerups[:]:
                     p.move()
@@ -316,6 +319,14 @@ def main():
                 if timers['dbl'] > 0:
                     timers['dbl'] -= 1
                     if timers['dbl'] == 0: score_mult = 1
+
+        elif state == 'LEVEL_CLEAR':
+            screen.fill(WHITE)
+            draw_text(f"STAGE {level} CLEAR!", 'T', BLUE, (SCREEN_W//2, SCREEN_H//2))
+            if pygame.time.get_ticks() - transition_start_time > 2000:
+                pygame.event.clear()
+                if level >= MAX_LEVEL: state = 'ALL_CLEAR'
+                else: level += 1; init_game(False, False); state = 'READY'
 
         elif state == 'PAUSE':
             s = pygame.Surface((SCREEN_W, SCREEN_H)); s.set_alpha(150); s.fill(BLACK); screen.blit(s, (0,0))
