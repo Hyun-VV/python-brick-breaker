@@ -21,7 +21,7 @@ SLOW_FACTOR = 0.7
 
 # --- 메타데이터 ---
 __title__ = 'Python Brick Breaker'
-__version__ = '1.6.5' # 클리어 도중 입력 버그 수정
+__version__ = '1.7.0' # UI 개선
 __author__ = 'Python Developer'
 
 # --- 클래스 ---
@@ -101,12 +101,11 @@ def main():
                 for c in range(BRICK_COLS):
                     bricks.append(Brick(sx + c*(BRICK_W+5), 80 + r*(BRICK_H+5)))
 
-    # [수정 완료] 변수명 text->txt, color->col 로 일치시킴
     def draw_text(txt, fk, col, center, shadow=False):
         if shadow:
             s = fonts[fk].render(txt, True, BLACK)
             screen.blit(s, s.get_rect(center=(center[0]+3, center[1]+3)))
-        s = fonts[fk].render(txt, True, col) # 여기가 문제였습니다. 수정 완료.
+        s = fonts[fk].render(txt, True, col)
         r = s.get_rect(center=center)
         screen.blit(s, r)
         return r
@@ -136,17 +135,24 @@ def main():
             if i == sel_idx: pygame.draw.rect(screen, ORANGE, r.inflate(40, 20), 3)
 
     def draw_end_screen(title, msg, col):
-        draw_text(title, 'T', col, (SCREEN_W//2, SCREEN_H//2 - 120))
-        if msg: draw_text(msg, 'L', ORANGE, (SCREEN_W//2, SCREEN_H//2 - 50))
+        # 타이틀 및 메시지 Y좌표 조정
+        draw_text(title, 'T', col, (SCREEN_W//2, SCREEN_H//2 - 140))
+        if msg: draw_text(msg, 'L', ORANGE, (SCREEN_W//2, SCREEN_H//2 - 70))
         
-        # [수정 완료] 점수 표시 간격 조정 (겹침 해결)
-        draw_text(f"Final Score: {score}", 'SUB', BLACK, (SCREEN_W//2, SCREEN_H//2 + 10))
-        if state in ['GAME_OVER', 'ALL_CLEAR']: 
-            draw_text(f"High Score: {highscore}", 'SUB', ORANGE, (SCREEN_W//2, SCREEN_H//2 + 60)) # +50 -> +60으로 간격 넓힘
-            
-        gy = SCREEN_H // 2 + 140
-        draw_keycap("SPACE", "RESTART", BLUE, (SCREEN_W//2 - 20, gy), 'left')
-        draw_keycap("ESC", "MENU", ORANGE, (SCREEN_W//2 + 20, gy), 'right')
+        # [수정 1] 최종 레벨 및 점수 표시
+        if state == 'GAME_OVER':
+            draw_text(f"Final Level: {level}", 'M', BLACK, (SCREEN_W//2, SCREEN_H//2 - 30))
+            draw_text(f"Final Score: {score}", 'SUB', BLACK, (SCREEN_W//2, SCREEN_H//2 + 10))
+            draw_text(f"High Score: {highscore}", 'SUB', ORANGE, (SCREEN_W//2, SCREEN_H//2 + 50))
+        else: # ALL_CLEAR
+            draw_text(f"Final Score: {score}", 'SUB', BLACK, (SCREEN_W//2, SCREEN_H//2 + 10))
+            draw_text(f"High Score: {highscore}", 'SUB', ORANGE, (SCREEN_W//2, SCREEN_H//2 + 50))
+
+        # [수정 2] 버튼 UI 대칭 및 깔끔하게 정리
+        gy = SCREEN_H // 2 + 160 # 버튼 Y좌표 조정
+        # 중앙을 기준으로 좌우 대칭되게 배치. 간격을 넓혀서 균형을 맞춤.
+        draw_keycap("SPACE", "RESTART", BLUE, (SCREEN_W // 2 - 250, gy), 'right')
+        draw_keycap("ESC", "MENU", ORANGE, (SCREEN_W // 2 + 90, gy), 'right')
 
     init_game(True)
 
